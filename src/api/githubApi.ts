@@ -13,6 +13,24 @@ export interface RealGitHubRepo {
   updated_at: string;
 }
 
+export interface GitHubUser {
+  login: string;
+  name: string | null;
+  avatar_url: string;
+  public_repos: number;
+  followers: number;
+  following: number;
+  bio: string | null;
+  html_url: string;
+}
+
+export interface CreateRepoPayload {
+  name: string;
+  description?: string;
+  private?: boolean;
+  auto_init?: boolean;
+}
+
 export interface RealGitHubBranch {
   name: string;
   commit: {
@@ -87,5 +105,49 @@ export async function fetchRepoCommits(owner: string, repo: string, token?: stri
   if (!response.ok) {
     throw new Error(`Failed to fetch commits for ${owner}/${repo}`);
   }
+  return response.json();
+}
+
+// ─── Fetch Authenticated User Profile ───────────────────────────────────────
+export async function fetchAuthenticatedUser(token: string): Promise<GitHubUser> {
+  const headers: HeadersInit = {
+    Accept: 'application/vnd.github.v3+json',
+    Authorization: `token ${token}`,
+  };
+  const response = await fetch(`${GITHUB_API_BASE}/user`, { headers });
+  if (!response.ok) {
+    throw new Error(`Invalid token or GitHub API error: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+// ─── Create a Real GitHub Repository via PAT ────────────────────────────────
+export async function createGitHubRepo(
+  payload: CreateRepoPayload,
+  token: string
+): Promise<RealGitHubRepo> {
+  const headers: HeadersInit = {
+    Accept: 'application/vnd.github.v3+json',
+    Authorization: `token ${token}`,
+    'Content-Type': 'application/json',
+  };
+
+  const response = await fetch(`${GITHUB_API_BASE}/user/repos`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name: payload.name,
+      description: payload.description ?? '',
+      private: payload.private ?? false,
+      auto_init: payload.auto_init ?? true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    const msg = (errBody as { message?: string }).message ?? response.statusText;
+    throw new Error(`GitHub API: ${msg}`);
+  }
+
   return response.json();
 }

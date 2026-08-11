@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Card, { CardHeader } from '@/components/ui/Card';
+import CreateRepoModal from '@/components/ui/CreateRepoModal';
 import {
   fetchUserRepos,
   fetchRepoBranches,
@@ -25,15 +26,16 @@ import {
   User,
   AlertCircle,
   Sparkles,
+  Plus,
 } from 'lucide-react';
 
 export default function GitHubPage() {
   // Account state persisted in localStorage
   const [username, setUsername] = useState<string>(() => {
-    return localStorage.getItem('mldevops_github_username') || 'torvalds'; // Default to famous torvalds or custom username
+    return localStorage.getItem('mldevops_github_username') || import.meta.env.VITE_GITHUB_USERNAME || 'torvalds'; // Default to env or famous torvalds
   });
   const [token, setToken] = useState<string>(() => {
-    return localStorage.getItem('mldevops_github_token') || '';
+    return localStorage.getItem('mldevops_github_token') || import.meta.env.VITE_GITHUB_TOKEN || '';
   });
 
   const [inputUsername, setInputUsername] = useState(username);
@@ -127,6 +129,14 @@ export default function GitHubPage() {
     };
   }, [selectedRepo, token]);
 
+  // Modals state
+  const [createRepoOpen, setCreateRepoOpen] = useState(false);
+
+  const handleCreateRepo = (newRepo: RealGitHubRepo) => {
+    setRepos((prev) => [newRepo, ...prev]);
+    setSelectedRepo(newRepo);
+  };
+
   // Save new account connection settings
   const handleSaveConnection = (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,11 +185,19 @@ export default function GitHubPage() {
 
         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <button
+            onClick={() => setCreateRepoOpen(true)}
+            className="px-3.5 py-2 rounded-lg bg-success-600 hover:bg-success-500 text-white text-xs font-semibold shadow-md shadow-success-500/20 transition-all flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Repository</span>
+          </button>
+
+          <button
             onClick={() => setShowConfig(!showConfig)}
             className="px-3.5 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-md shadow-primary-500/20 transition-all flex items-center gap-1.5"
           >
             <User className="w-3.5 h-3.5" />
-            <span>{showConfig ? 'Close Settings' : 'Connect Your GitHub Account'}</span>
+            <span>{showConfig ? 'Close Settings' : 'Account Settings'}</span>
           </button>
         </div>
       </Card>
@@ -324,11 +342,10 @@ export default function GitHubPage() {
                   <button
                     key={repo.id}
                     onClick={() => setSelectedRepo(repo)}
-                    className={`w-full text-left p-3 rounded-xl border transition-all ${
-                      selectedRepo?.id === repo.id
-                        ? 'border-primary-500 bg-primary-500/10 text-primary-400 shadow-md shadow-primary-500/10'
-                        : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900/60'
-                    }`}
+                    className={`w-full text-left p-3 rounded-xl border transition-all ${selectedRepo?.id === repo.id
+                      ? 'border-primary-500 bg-primary-500/10 text-primary-400 shadow-md shadow-primary-500/10'
+                      : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900/60'
+                      }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
@@ -536,6 +553,15 @@ export default function GitHubPage() {
 
         </div>
       </div>
+
+      {/* ── Create Repository Modal ── */}
+      <CreateRepoModal
+        isOpen={createRepoOpen}
+        username={username}
+        token={token}
+        onClose={() => setCreateRepoOpen(false)}
+        onCreate={handleCreateRepo}
+      />
 
     </div>
   );
