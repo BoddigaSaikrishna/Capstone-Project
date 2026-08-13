@@ -34,13 +34,13 @@ import {
 export default function JenkinsPage() {
   // ── Credentials (env vars → localStorage → empty) ───────────────────────────
   const [url, setUrl] = useState<string>(() =>
-    localStorage.getItem('mldevops_jenkins_url') || import.meta.env.VITE_JENKINS_URL || ''
+    import.meta.env.VITE_JENKINS_URL || localStorage.getItem('mldevops_jenkins_url') || ''
   );
   const [username, setUsername] = useState<string>(() =>
-    localStorage.getItem('mldevops_jenkins_username') || import.meta.env.VITE_JENKINS_USERNAME || ''
+    import.meta.env.VITE_JENKINS_USERNAME || localStorage.getItem('mldevops_jenkins_username') || ''
   );
   const [token, setToken] = useState<string>(() =>
-    localStorage.getItem('mldevops_jenkins_token') || import.meta.env.VITE_JENKINS_TOKEN || ''
+    import.meta.env.VITE_JENKINS_TOKEN || localStorage.getItem('mldevops_jenkins_token') || ''
   );
 
   const [inputUrl, setInputUrl] = useState(url);
