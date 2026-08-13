@@ -1,114 +1,149 @@
 // Live Jenkins REST API Client & Service Layer
 import type { JenkinsPipeline, JenkinsBuild, Status } from '@/types';
-import { jenkinsPipelines as mockPipelines, jenkinsBuilds as mockBuilds, jenkinsBuildLog as mockLog } from '@/api/mockData';
 
-// Map Jenkins color statuses to app Status type
+// ─── Status Mappers ──────────────────────────────────────────────────────────
+
 export function mapJenkinsColorToStatus(color: string): Status {
   if (!color) return 'idle';
   if (color.endsWith('_anime')) return 'running';
   switch (color) {
-    case 'blue':
-      return 'success';
-    case 'red':
-      return 'failed';
-    case 'yellow':
-      return 'warning';
-    case 'aborted':
-      return 'stopped';
+    case 'blue': return 'success';
+    case 'red': return 'failed';
+    case 'yellow': return 'warning';
+    case 'aborted': return 'stopped';
     case 'disabled':
     case 'grey':
     case 'notbuilt':
-    default:
-      return 'idle';
+    default: return 'idle';
   }
 }
 
-// Map Jenkins build result to app Status type
 export function mapJenkinsResultToStatus(result: string | null): Status {
   if (!result) return 'running';
   switch (result.toUpperCase()) {
-    case 'SUCCESS':
-      return 'success';
-    case 'FAILURE':
-      return 'failed';
-    case 'UNSTABLE':
-      return 'warning';
-    case 'ABORTED':
-      return 'stopped';
-    default:
-      return 'idle';
+    case 'SUCCESS': return 'success';
+    case 'FAILURE': return 'failed';
+    case 'UNSTABLE': return 'warning';
+    case 'ABORTED': return 'stopped';
+    default: return 'idle';
   }
 }
 
-// Utility to generate Basic Auth header
-function getAuthHeaders(username: string, token: string): HeadersInit {
+// ─── Auth Helpers ─────────────────────────────────────────────────────────────
+
+export function getAuthHeaders(username: string, token: string): HeadersInit {
   const creds = btoa(`${username}:${token}`);
   return {
     'Authorization': `Basic ${creds}`,
-    'Accept': 'application/vnd.jenkins.v3+json, application/json',
+    'Accept': 'application/json',
+    // ngrok requires this header to bypass the browser warning page
+    'ngrok-skip-browser-warning': 'true',
   };
 }
 
-// Fetch all jobs from Jenkins server
+// ─── Connection Test ──────────────────────────────────────────────────────────
+
+export interface JenkinsServerInfo {
+  version: string;
+  nodeName: string;
+  numExecutors: number;
+  description: string | null;
+}
+
+export async function testJenkinsConnection(
+  url: string,
+  username: string,
+  token: string
+): Promise<JenkinsServerInfo> {
+  const cleanUrl = url.replace(/\/$/, '');
+  const response = await fetch(`${cleanUrl}/api/json?tree=nodeName,numExecutors,description`, {
+    headers: getAuthHeaders(username, token),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Authentication failed — check username and API token.');
+    if (response.status === 403) throw new Error('Access denied — your token lacks permissions.');
+    throw new Error(`Jenkins server responded with ${response.status}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  // Jenkins returns X-Jenkins version header
+  const version = response.headers.get('X-Jenkins') || 'Unknown';
+  return {
+    version,
+    nodeName: data.nodeName || 'Jenkins Master',
+    numExecutors: data.numExecutors || 0,
+    description: data.description || null,
+  };
+}
+
+// ─── Fetch Jobs ───────────────────────────────────────────────────────────────
+
 export async function fetchJenkinsJobs(
   url: string,
   username: string,
   token: string
 ): Promise<JenkinsPipeline[]> {
-  if (!url || !username || !token) {
-    return mockPipelines;
-  }
-
   const cleanUrl = url.replace(/\/$/, '');
-  const response = await fetch(`${cleanUrl}/api/json?tree=jobs[name,url,color,lastBuild[number]]`, {
-    headers: getAuthHeaders(username, token),
-  });
+  const response = await fetch(
+    `${cleanUrl}/api/json?tree=jobs[name,url,color,lastBuild[number,duration,timestamp]]`,
+    { headers: getAuthHeaders(username, token) }
+  );
 
   if (!response.ok) {
-    throw new Error(`Jenkins API error: ${response.statusText}`);
+    throw new Error(`Jenkins API error: ${response.status} ${response.statusText}`);
   }
 
   const data = await response.json();
-  return (data.jobs || []).map((job: any) => ({
-    id: `jp_${job.name}`,
-    name: job.name,
-    status: mapJenkinsColorToStatus(job.color),
-    lastBuild: job.lastBuild?.number || 0,
-    duration: 'N/A',
-    triggeredBy: 'Jenkins Trigger',
-  }));
+  return (data.jobs || []).map((job: any) => {
+    const lb = job.lastBuild;
+    const durationSec = lb?.duration ? Math.round(lb.duration / 1000) : 0;
+    const durationStr = durationSec > 0
+      ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+      : 'N/A';
+    return {
+      id: `jp_${job.name}`,
+      name: job.name,
+      status: mapJenkinsColorToStatus(job.color),
+      lastBuild: lb?.number || 0,
+      duration: durationStr,
+      triggeredBy: 'Jenkins',
+    };
+  });
 }
 
-// Fetch builds for a specific job
+// ─── Fetch Builds for a Job ───────────────────────────────────────────────────
+
 export async function fetchJenkinsBuilds(
   url: string,
   jobName: string,
   username: string,
   token: string
 ): Promise<JenkinsBuild[]> {
-  if (!url || !username || !token) {
-    return mockBuilds.filter(b => b.pipeline === jobName || jobName === '');
-  }
-
   const cleanUrl = url.replace(/\/$/, '');
-  const response = await fetch(`${cleanUrl}/job/${jobName}/api/json?tree=builds[number,url,result,duration,timestamp,actions[causes[shortDescription]]]`, {
-    headers: getAuthHeaders(username, token),
-  });
+  const response = await fetch(
+    `${cleanUrl}/job/${encodeURIComponent(jobName)}/api/json?tree=builds[number,result,duration,timestamp,actions[causes[shortDescription]]]`,
+    { headers: getAuthHeaders(username, token) }
+  );
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch builds for job ${jobName}`);
+    throw new Error(`Failed to fetch builds for "${jobName}": ${response.statusText}`);
   }
 
   const data = await response.json();
   return (data.builds || []).map((build: any) => {
     let triggeredBy = 'System';
-    const causeAction = (build.actions || []).find((a: any) => a._class === 'hudson.model.CauseAction' || a.causes);
-    if (causeAction && causeAction.causes && causeAction.causes.length > 0) {
-      triggeredBy = causeAction.causes[0].shortDescription || 'User';
+    const causeAction = (build.actions || []).find(
+      (a: any) => a._class === 'hudson.model.CauseAction' || a.causes
+    );
+    if (causeAction?.causes?.length > 0) {
+      triggeredBy = causeAction.causes[0].shortDescription?.replace('Started by ', '') || 'User';
     }
 
     const durationSec = Math.round(build.duration / 1000);
-    const durationStr = durationSec > 0 ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s` : '0m 0s';
+    const durationStr = durationSec > 0
+      ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+      : 'In progress...';
 
     return {
       id: `jb_${jobName}_${build.number}`,
@@ -117,12 +152,13 @@ export async function fetchJenkinsBuilds(
       status: mapJenkinsResultToStatus(build.result),
       duration: build.duration > 0 ? durationStr : 'In progress...',
       timestamp: new Date(build.timestamp).toISOString(),
-      triggeredBy: triggeredBy.replace('Started by ', ''),
+      triggeredBy,
     };
   });
 }
 
-// Fetch console text/log output for a build
+// ─── Fetch Console Log ────────────────────────────────────────────────────────
+
 export async function fetchJenkinsBuildLog(
   url: string,
   jobName: string,
@@ -130,37 +166,30 @@ export async function fetchJenkinsBuildLog(
   username: string,
   token: string
 ): Promise<string> {
-  if (!url || !username || !token) {
-    return mockLog;
-  }
-
   const cleanUrl = url.replace(/\/$/, '');
-  const response = await fetch(`${cleanUrl}/job/${jobName}/${buildNumber}/consoleText`, {
-    headers: getAuthHeaders(username, token),
-  });
+  const response = await fetch(
+    `${cleanUrl}/job/${encodeURIComponent(jobName)}/${buildNumber}/consoleText`,
+    { headers: getAuthHeaders(username, token) }
+  );
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch build logs for #${buildNumber}`);
+    throw new Error(`Failed to fetch console log for build #${buildNumber}`);
   }
 
   return response.text();
 }
 
-// Trigger a Jenkins build job
+// ─── Trigger a Build ──────────────────────────────────────────────────────────
+
 export async function triggerJenkinsBuild(
   url: string,
   jobName: string,
   username: string,
   token: string
 ): Promise<boolean> {
-  if (!url || !username || !token) {
-    // If no credentials, we simulate build triggers locally
-    return true;
-  }
-
   const cleanUrl = url.replace(/\/$/, '');
-  
-  // 1. Get Crumb token (if CSRF protection is enabled, which is standard in modern Jenkins)
+
+  // Try to get CSRF crumb first (standard in Jenkins 2.x+)
   let crumbHeaders: HeadersInit = {};
   try {
     const crumbRes = await fetch(`${cleanUrl}/crumbIssuer/api/json`, {
@@ -172,12 +201,11 @@ export async function triggerJenkinsBuild(
         crumbHeaders = { [crumbData.crumbRequestField]: crumbData.crumb };
       }
     }
-  } catch (e) {
-    // Crumb issuer might not be configured, skip
+  } catch {
+    // CSRF protection might not be enabled — proceed without crumb
   }
 
-  // 2. Trigger the job build
-  const response = await fetch(`${cleanUrl}/job/${jobName}/build`, {
+  const response = await fetch(`${cleanUrl}/job/${encodeURIComponent(jobName)}/build`, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(username, token),
@@ -185,8 +213,9 @@ export async function triggerJenkinsBuild(
     },
   });
 
+  // 201 Created = build queued successfully; 200 also acceptable
   if (!response.ok && response.status !== 201) {
-    throw new Error(`Failed to trigger build: ${response.statusText}`);
+    throw new Error(`Failed to trigger build: ${response.status} ${response.statusText}`);
   }
 
   return true;
