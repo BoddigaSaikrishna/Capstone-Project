@@ -1,4 +1,6 @@
 // Live Jenkins REST API Client & Service Layer
+// All requests go through /jenkins-proxy (Vite dev server proxy → ngrok → Jenkins)
+// This avoids CORS errors when Jenkins is running on localhost behind ngrok.
 import type { JenkinsPipeline, JenkinsBuild, Status } from '@/types';
 
 // ─── Status Mappers ──────────────────────────────────────────────────────────
@@ -31,14 +33,29 @@ export function mapJenkinsResultToStatus(result: string | null): Status {
 
 // ─── Auth Helpers ─────────────────────────────────────────────────────────────
 
-export function getAuthHeaders(username: string, token: string): HeadersInit {
+function getAuthHeaders(username: string, token: string): HeadersInit {
   const creds = btoa(`${username}:${token}`);
   return {
     'Authorization': `Basic ${creds}`,
     'Accept': 'application/json',
-    // ngrok requires this header to bypass the browser warning page
     'ngrok-skip-browser-warning': 'true',
   };
+}
+
+/**
+ * Resolve the base URL for Jenkins API calls.
+ * - In development: use the Vite proxy at /jenkins-proxy (avoids CORS)
+ * - If a custom URL is provided by the user (not same as env), use it directly
+ */
+function resolveBase(url: string): string {
+  const envUrl = (import.meta.env.VITE_JENKINS_URL || '').replace(/\/$/, '');
+  const inputUrl = url.replace(/\/$/, '');
+  // If the URL matches the env-configured URL, use the Vite proxy path
+  if (!inputUrl || inputUrl === envUrl) {
+    return '/jenkins-proxy';
+  }
+  // Otherwise use the URL directly (user has entered a custom one)
+  return inputUrl;
 }
 
 // ─── Connection Test ──────────────────────────────────────────────────────────
@@ -55,24 +72,23 @@ export async function testJenkinsConnection(
   username: string,
   token: string
 ): Promise<JenkinsServerInfo> {
-  const cleanUrl = url.replace(/\/$/, '');
-  const response = await fetch(`${cleanUrl}/api/json?tree=nodeName,numExecutors,description`, {
+  const base = resolveBase(url);
+  const response = await fetch(`${base}/api/json?tree=nodeName,numExecutors,description`, {
     headers: getAuthHeaders(username, token),
   });
 
   if (!response.ok) {
     if (response.status === 401) throw new Error('Authentication failed — check username and API token.');
     if (response.status === 403) throw new Error('Access denied — your token lacks permissions.');
-    throw new Error(`Jenkins server responded with ${response.status}: ${response.statusText}`);
+    throw new Error(`Jenkins responded with ${response.status}: ${response.statusText}`);
   }
 
   const data = await response.json();
-  // Jenkins returns X-Jenkins version header
   const version = response.headers.get('X-Jenkins') || 'Unknown';
   return {
     version,
     nodeName: data.nodeName || 'Jenkins Master',
-    numExecutors: data.numExecutors || 0,
+    numExecutors: data.numExecutors ?? 0,
     description: data.description || null,
   };
 }
@@ -84,9 +100,9 @@ export async function fetchJenkinsJobs(
   username: string,
   token: string
 ): Promise<JenkinsPipeline[]> {
-  const cleanUrl = url.replace(/\/$/, '');
+  const base = resolveBase(url);
   const response = await fetch(
-    `${cleanUrl}/api/json?tree=jobs[name,url,color,lastBuild[number,duration,timestamp]]`,
+    `${base}/api/json?tree=jobs[name,url,color,lastBuild[number,duration,timestamp]]`,
     { headers: getAuthHeaders(username, token) }
   );
 
@@ -120,9 +136,9 @@ export async function fetchJenkinsBuilds(
   username: string,
   token: string
 ): Promise<JenkinsBuild[]> {
-  const cleanUrl = url.replace(/\/$/, '');
+  const base = resolveBase(url);
   const response = await fetch(
-    `${cleanUrl}/job/${encodeURIComponent(jobName)}/api/json?tree=builds[number,result,duration,timestamp,actions[causes[shortDescription]]]`,
+    `${base}/job/${encodeURIComponent(jobName)}/api/json?tree=builds[number,result,duration,timestamp,actions[causes[shortDescription]]]`,
     { headers: getAuthHeaders(username, token) }
   );
 
@@ -166,9 +182,9 @@ export async function fetchJenkinsBuildLog(
   username: string,
   token: string
 ): Promise<string> {
-  const cleanUrl = url.replace(/\/$/, '');
+  const base = resolveBase(url);
   const response = await fetch(
-    `${cleanUrl}/job/${encodeURIComponent(jobName)}/${buildNumber}/consoleText`,
+    `${base}/job/${encodeURIComponent(jobName)}/${buildNumber}/consoleText`,
     { headers: getAuthHeaders(username, token) }
   );
 
@@ -187,12 +203,12 @@ export async function triggerJenkinsBuild(
   username: string,
   token: string
 ): Promise<boolean> {
-  const cleanUrl = url.replace(/\/$/, '');
+  const base = resolveBase(url);
 
-  // Try to get CSRF crumb first (standard in Jenkins 2.x+)
+  // Try to get CSRF crumb first (required in Jenkins 2.x+)
   let crumbHeaders: HeadersInit = {};
   try {
-    const crumbRes = await fetch(`${cleanUrl}/crumbIssuer/api/json`, {
+    const crumbRes = await fetch(`${base}/crumbIssuer/api/json`, {
       headers: getAuthHeaders(username, token),
     });
     if (crumbRes.ok) {
@@ -205,7 +221,7 @@ export async function triggerJenkinsBuild(
     // CSRF protection might not be enabled — proceed without crumb
   }
 
-  const response = await fetch(`${cleanUrl}/job/${encodeURIComponent(jobName)}/build`, {
+  const response = await fetch(`${base}/job/${encodeURIComponent(jobName)}/build`, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(username, token),
@@ -213,7 +229,7 @@ export async function triggerJenkinsBuild(
     },
   });
 
-  // 201 Created = build queued successfully; 200 also acceptable
+  // 201 = queued successfully; 200 also acceptable
   if (!response.ok && response.status !== 201) {
     throw new Error(`Failed to trigger build: ${response.status} ${response.statusText}`);
   }
