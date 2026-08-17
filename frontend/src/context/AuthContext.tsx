@@ -14,6 +14,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, role?: 'Admin' | 'Developer' | 'Stakeholder', name?: string) => void;
   logout: () => void;
+  updateUser: (updates: Partial<UserProfile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) {
+      } catch {
         return null;
       }
     }
@@ -57,8 +58,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateUser = (updates: Partial<UserProfile>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...updates };
+      if (updates.name) {
+        updated.avatarInitials = updates.name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase() || 'U';
+      }
+      return updated;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
