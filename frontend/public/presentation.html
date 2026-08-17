@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Capstone Review-1 Presentation Deck | DevOps & MLOps Control Center</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: #0b0f19;
+      color: #f3f4f6;
+    }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .slide {
+      display: none;
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .slide.active {
+      display: flex;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col justify-between select-none">
+
+  <!-- Top Navbar -->
+  <header class="h-16 border-b border-gray-800/80 px-8 flex items-center justify-between bg-gray-950/60 backdrop-blur-md">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
+        ⚡
+      </div>
+      <div>
+        <h1 class="text-sm font-bold text-gray-100">DevOps &amp; MLOps Orchestration Pipeline</h1>
+        <p class="text-[11px] text-gray-400 font-mono">Capstone Review–1 (17th–22nd August 2026)</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <span id="slideCounter" class="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-mono font-bold">
+        Slide 1 / 10
+      </span>
+      <button onclick="toggleFullscreen()" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium transition">
+        ⛶ Fullscreen
+      </button>
+      <a href="/" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition">
+        Launch App 🚀
+      </a>
+    </div>
+  </header>
+
+  <!-- Slide Canvas Container -->
+  <main class="flex-1 p-8 sm:p-12 flex items-center justify-center overflow-hidden">
+    <div class="w-full max-w-5xl h-full flex flex-col justify-center">
+
+      <!-- SLIDE 1: Title -->
+      <div class="slide active flex-col items-center justify-center text-center space-y-6">
+        <span class="px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-mono font-semibold uppercase tracking-wider">
+          Capstone Project Review – 1
+        </span>
+        <h1 class="text-4xl sm:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-blue-400 leading-tight">
+          DevOps &amp; MLOps Orchestration<br>Pipeline Dashboard
+        </h1>
+        <p class="text-base sm:text-lg text-gray-400 max-w-2xl font-light">
+          Unified Real-time Control Center for Infrastructure Telemetry, CI/CD Automation &amp; Machine Learning Lifecycle Management
+        </p>
+
+        <div class="pt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
+          <div class="glass-card p-4 rounded-xl text-left">
+            <p class="text-xs text-gray-500">Presenter / Team Lead</p>
+            <p class="text-sm font-bold text-gray-100 mt-1">Boddiga Sai Krishna</p>
+          </div>
+          <div class="glass-card p-4 rounded-xl text-left">
+            <p class="text-xs text-gray-500">Department &amp; Track</p>
+            <p class="text-sm font-bold text-gray-100 mt-1">CSE (DevOps &amp; MLOps)</p>
+          </div>
+          <div class="glass-card p-4 rounded-xl text-left">
+            <p class="text-xs text-gray-500">Review Window</p>
+            <p class="text-sm font-bold text-blue-400 mt-1">17th – 22nd Aug 2026</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 2: Problem Statement -->
+      <div class="slide flex-col space-y-6">
+        <div>
+          <span class="text-xs font-mono text-blue-400 uppercase tracking-widest font-semibold">02. Motivation &amp; Background</span>
+          <h2 class="text-3xl font-bold text-white mt-1">Problem Statement</h2>
+        </div>
+
+        <div class="glass-card p-6 rounded-2xl border-l-4 border-l-blue-500">
+          <blockquote class="text-lg text-gray-200 italic font-light">
+            "Modern software and AI engineering teams operate across fragmented, isolated toolchains—GitHub for code, Jenkins for builds, Docker/K8s for deployment, and MLflow for models. This creates high cognitive friction, delayed build visibility, and severe CORS cross-origin integration barriers."
+          </blockquote>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+          <div class="glass-card p-5 rounded-xl">
+            <div class="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center font-bold mb-3">⚠️</div>
+            <h3 class="text-sm font-bold text-white">Siloed Tooling</h3>
+            <p class="text-xs text-gray-400 mt-1">No single dashboard linking Git commits, Jenkins builds, and ML accuracy metrics.</p>
+          </div>
+          <div class="glass-card p-5 rounded-xl">
+            <div class="w-8 h-8 rounded-lg bg-yellow-500/10 text-yellow-400 flex items-center justify-center font-bold mb-3">🔒</div>
+            <h3 class="text-sm font-bold text-white">CORS Security Locks</h3>
+            <p class="text-xs text-gray-400 mt-1">Browser security blocks direct web calls to local CI/CD engines like Jenkins.</p>
+          </div>
+          <div class="glass-card p-5 rounded-xl">
+            <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold mb-3">📡</div>
+            <h3 class="text-sm font-bold text-white">Observability Delay</h3>
+            <p class="text-xs text-gray-400 mt-1">Lack of live 2.5s telemetry streaming for CPU, RAM, and API latency streams.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 3: SMART Objectives -->
+      <div class="slide flex-col space-y-6">
+        <div>
+          <span class="text-xs font-mono text-blue-400 uppercase tracking-widest font-semibold">03. Project Goals</span>
+          <h2 class="text-3xl font-bold text-white mt-1">SMART Objectives</h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+          <div class="glass-card p-4 rounded-xl border-t-2 border-t-blue-500">
+            <span class="text-2xl font-extrabold text-blue-400 font-mono">S</span>
+            <h3 class="text-xs font-bold text-white mt-1">Specific</h3>
+            <p class="text-[11px] text-gray-400 mt-1">Unified web control center integrating live GitHub REST API v3, Jenkins REST API &amp; Telemetry.</p>
+          </div>
+          <div class="glass-card p-4 rounded-xl border-t-2 border-t-cyan-500">
+            <span class="text-2xl font-extrabold text-cyan-400 font-mono">M</span>
+            <h3 class="text-xs font-bold text-white mt-1">Measurable</h3>
+            <p class="text-[11px] text-gray-400 mt-1">&lt;200ms API response latency, 100% CORS-bypassed proxy, 2.5s stream refresh.</p>
+          </div>
+          <div class="glass-card p-4 rounded-xl border-t-2 border-t-green-500">
+            <span class="text-2xl font-extrabold text-green-400 font-mono">A</span>
+            <h3 class="text-xs font-bold text-white mt-1">Achievable</h3>
+            <p class="text-[11px] text-gray-400 mt-1">Engineered with React 18, TypeScript, Vite, Tailwind CSS &amp; Vite Reverse Proxy.</p>
+          </div>
+          <div class="glass-card p-4 rounded-xl border-t-2 border-t-yellow-500">
+            <span class="text-2xl font-extrabold text-yellow-400 font-mono">R</span>
+            <h3 class="text-xs font-bold text-white mt-1">Relevant</h3>
+            <p class="text-[11px] text-gray-400 mt-1">Combines traditional CI/CD pipelines with modern MLOps model version tracking.</p>
+          </div>
+          <div class="glass-card p-4 rounded-xl border-t-2 border-t-purple-500">
+            <span class="text-2xl font-extrabold text-purple-400 font-mono">T</span>
+            <h3 class="text-xs font-bold text-white mt-1">Time-Bound</h3>
+            <p class="text-[11px] text-gray-400 mt-1">Review-1 (Aug 2026), Integration (Oct 2026), Final Deployment (Nov 2026).</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 4: Literature Review -->
+      <div class="slide flex-col space-y-6">
+        <div>
+          <span class="text-xs font-mono text-blue-400 uppercase tracking-widest font-semibold">04. Competitive Analysis</span>
+          <h2 class="text-3xl font-bold text-white mt-1">Literature Review &amp; Technology Gap</h2>
+        </div>
+
+        <div class="glass-card rounded-xl overflow-hidden border border-gray-800">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-gray-900/80 text-gray-400 font-mono uppercase text-[10px]">
+              <tr>
+                <th class="p-3.5">Feature</th>
+                <th class="p-3.5">Jenkins UI</th>
+                <th class="p-3.5">GitHub Actions</th>
+                <th class="p-3.5">Grafana / Datadog</th>
+                <th class="p-3.5 text-blue-400 font-bold bg-blue-500/10">Our Platform</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/60">
+              <tr>
+                <td class="p-3.5 font-medium text-white">Git Repository Control</td>
+                <td class="p-3.5 text-gray-400">Plugin Required</td>
+                <td class="p-3.5 text-green-400">Native</td>
+                <td class="p-3.5 text-gray-500">None</td>
+                <td class="p-3.5 text-green-400 font-bold bg-blue-500/5">Native Live API v3</td>
+              </tr>
+              <tr>
+                <td class="p-3.5 font-medium text-white">Live CI/CD Triggering</td>
+                <td class="p-3.5 text-green-400">Native</td>
+                <td class="p-3.5 text-gray-400">Actions Only</td>
+                <td class="p-3.5 text-gray-500">None</td>
+                <td class="p-3.5 text-green-400 font-bold bg-blue-500/5">Live REST Trigger</td>
+              </tr>
+              <tr>
+                <td class="p-3.5 font-medium text-white">ML Model Tracking</td>
+                <td class="p-3.5 text-gray-500">None</td>
+                <td class="p-3.5 text-gray-500">None</td>
+                <td class="p-3.5 text-gray-500">None</td>
+                <td class="p-3.5 text-green-400 font-bold bg-blue-500/5">Native MLOps Matrix</td>
+              </tr>
+              <tr>
+                <td class="p-3.5 font-medium text-white">CORS Proxy Bypass</td>
+                <td class="p-3.5 text-gray-500">No</td>
+                <td class="p-3.5 text-gray-500">No</td>
+                <td class="p-3.5 text-gray-500">N/A</td>
+                <td class="p-3.5 text-green-400 font-bold bg-blue-500/5">Built-in Vite Proxy</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SLIDE 5: System Architecture -->
+      <div class="slide flex-col space-y-6">
+        <div>
+          <span class="text-xs font-mono text-blue-400 uppercase tracking-widest font-semibold">05. Technical Blueprint</span>
+          <h2 class="text-3xl font-bold text-white mt-1">System Architecture Flow</h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="glass-card p-5 rounded-xl border-t-2 border-t-blue-500 space-y-2">
+            <span class="text-[10px] font-mono text-blue-400 uppercase font-bold">Client Presentation</span>
+            <h3 class="text-sm font-bold text-white">React 18 + TypeScript</h3>
+            <p class="text-xs text-gray-400">Tailwind CSS glassmorphic interface with Recharts telemetry stream.</p>
+          </div>
+
+          <div class="glass-card p-5 rounded-xl border-t-2 border-t-cyan-500 space-y-2">
+            <span class="text-[10px] font-mono text-cyan-400 uppercase font-bold">Reverse Proxy Gateway</span>
+            <h3 class="text-sm font-bold text-white">Vite Proxy (/jenkins-proxy)</h3>
+            <p class="text-xs text-gray-400">Bypasses browser CORS restrictions by forwarding requests directly to localhost:8080.</p>
+          </div>
+
+          <div class="glass-card p-5 rounded-xl border-t-2 border-t-green-500 space-y-2">
+            <span class="text-[10px] font-mono text-green-400 uppercase font-bold">Backend &amp; Storage</span>
+            <h3 class="text-sm font-bold text-white">Supabase PostgreSQL</h3>
+            <p class="text-xs text-gray-400">Persists ML applications, model accuracy scores, and deployment histories.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 6: Software & Hardware -->
+      <div class="slide flex-col space-y-6">
+        <div>
+          <span class="text-xs font-mono text-blue-400 uppercase tracking-widest font-semibold">06. System Specifications</span>
+          <h2 class="text-3xl font-bold text-white mt-1">Hardware &amp; Software Requirements</h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div class="glass-card p-6 rounded-xl space-y-3">
+            <h3 class="text-sm font-bold text-blue-400 flex items-center gap-2">💻 Software Environment</h3>
+            <ul class="text-xs text-gray-300 space-y-2 font-mono">
+              <li>• Frontend: React v18.3.1, TypeScript v5.5.3</li>
+              <li>• Build Tool: Vite v5.4.8 with Reverse Proxy</li>
+              <li>• Styling: Tailwind CSS v3.4.1, Lucide Icons</li>
+              <li>• Automation: Jenkins CI/CD v2.528.1</li>
+              <li>• Database: Supabase PostgreSQL BaaS</li>
+            </ul>
+          </div>
+
+          <div class="glass-card p-6 rounded-xl space-y-3">
+            <h3 class="text-sm font-bold text-cyan-400 flex items-center gap-2">⚡ Hardware Specifications</h3>
+            <ul class="text-xs text-gray-300 space-y-2 font-mono">
+              <li>• CPU: Intel Core i5 / AMD Ryzen 5 (8th Gen+)</li>
+              <li>• Memory: 8 GB RAM Minimum (16 GB Rec.)</li>
+              <li>• Disk: 10 GB SSD Storage</li>
+              <li>• Network: Localhost / High-Speed Internet</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 7: Modules & Features -->
+      <div class="slide flex-col space-y-6">
+        <div>
+          <span class="text-xs font-mono text-blue-400 uppercase tracking-widest font-semibold">07. Core Capabilities</span>
+          <h2 class="text-3xl font-bold text-white mt-1">Module &amp; Feature Breakdown</h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="glass-card p-4 rounded-xl flex gap-3 items-start">
+            <div class="p-2 rounded-lg bg-blue-500/10 text-blue-400 text-sm">🐙</div>
+            <div>
+              <h3 class="text-xs font-bold text-white">GitHub Live Integration</h3>
+              <p class="text-[11px] text-gray-400 mt-0.5">Live repos, commit inspector, branch architecture &amp; remote repo creation.</p>
+            </div>
+          </div>
+          <div class="glass-card p-4 rounded-xl flex gap-3 items-start">
+            <div class="p-2 rounded-lg bg-orange-500/10 text-orange-400 text-sm">⚙️</div>
+            <div>
+              <h3 class="text-xs font-bold text-white">Jenkins CI/CD Control</h3>
+              <p class="text-[11px] text-gray-400 mt-0.5">Live status detection, instant "Build Now" triggers &amp; real-time console log viewer.</p>
+            </div>
+          </div>
+          <div class="glass-card p-4 rounded-xl flex gap-3 items-start">
+            <div class="p-2 rounded-lg bg-green-500/10 text-green-400 text-sm">📈</div>
+            <div>
+              <h3 class="text-xs font-bold text-white">Live Telemetry Engine</h3>
+              <p class="text-[11px] text-gray-400 mt-0.5">2.5s real-time streams for CPU, RAM, Latency &amp; Microservice health matrix.</p>
+            </div>
+          </div>
+          <div class="glass-card p-4 rounded-xl flex gap-3 items-start">
+            <div class="p-2 rounded-lg bg-purple-500/10 text-purple-400 text-sm">📂</div>
+            <div>
+              <h3 class="text-xs font-bold text-white">Modular Architecture</h3>
+              <p class="text-[11px] text-gray-400 mt-0.5">Segregated /frontend (React UI) and /backend (Supabase SQL) codebases.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 8: Team Task Distribution -->
+      <div class="slide flex-col space-y-6">
+        <div>
+          <span class="text-xs font-mono text-blue-400 uppercase tracking-widest font-semibold">08. Execution Roles</span>
+          <h2 class="text-3xl font-bold text-white mt-1">Team Task Distribution</h2>
+        </div>
+
+        <div class="glass-card rounded-xl overflow-hidden">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-gray-900 text-gray-400 font-mono text-[10px] uppercase">
+              <tr>
+                <th class="p-3">Team Member</th>
+                <th class="p-3">Role</th>
+                <th class="p-3">Assigned Deliverables</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/50">
+              <tr>
+                <td class="p-3 font-bold text-blue-400">Boddiga Sai Krishna</td>
+                <td class="p-3 text-white">Team Lead &amp; Architect</td>
+                <td class="p-3 text-gray-400">Vite Proxy Gateway, GitHub &amp; Jenkins Live API Integration</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-gray-200">Member 2</td>
+                <td class="p-3 text-white">Frontend Developer</td>
+                <td class="p-3 text-gray-400">React UI Components, Tailwind Styling, Recharts Telemetry Charts</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-gray-200">Member 3</td>
+                <td class="p-3 text-white">Backend &amp; MLOps Lead</td>
+                <td class="p-3 text-gray-400">Supabase Database Schemas, ML Applications Tracking Engine</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-gray-200">Member 4</td>
+                <td class="p-3 text-white">QA &amp; Testing</td>
+                <td class="p-3 text-gray-400">CORS Security Audits, Unit Tests &amp; Review Documentation</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SLIDE 9: Project Roadmap -->
+      <div class="slide flex-col space-y-6">
+        <div>
+          <span class="text-xs font-mono text-blue-400 uppercase tracking-widest font-semibold">09. Timeline</span>
+          <h2 class="text-3xl font-bold text-white mt-1">Project Roadmap &amp; Phases</h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div class="glass-card p-4 rounded-xl border-l-2 border-l-green-500">
+            <span class="text-[10px] font-mono text-green-400 font-bold">AUG 17–22 (COMPLETED)</span>
+            <h3 class="text-xs font-bold text-white mt-1">Phase 1: Review-1</h3>
+            <p class="text-[11px] text-gray-400 mt-1">Architecture, Live GitHub PAT &amp; Jenkins Localhost Proxy Setup.</p>
+          </div>
+          <div class="glass-card p-4 rounded-xl border-l-2 border-l-blue-500 opacity-80">
+            <span class="text-[10px] font-mono text-blue-400 font-bold">SEPTEMBER 2026</span>
+            <h3 class="text-xs font-bold text-white mt-1">Phase 2: Containers</h3>
+            <p class="text-[11px] text-gray-400 mt-1">Docker Engine API &amp; Kubernetes Cluster Live Pod Telemetry.</p>
+          </div>
+          <div class="glass-card p-4 rounded-xl border-l-2 border-l-yellow-500 opacity-80">
+            <span class="text-[10px] font-mono text-yellow-400 font-bold">OCTOBER 2026</span>
+            <h3 class="text-xs font-bold text-white mt-1">Phase 3: Cloud &amp; ML</h3>
+            <p class="text-[11px] text-gray-400 mt-1">AWS EC2/S3 Cloud Connectors &amp; Automated ML Pipelines.</p>
+          </div>
+          <div class="glass-card p-4 rounded-xl border-l-2 border-l-purple-500 opacity-80">
+            <span class="text-[10px] font-mono text-purple-400 font-bold">NOVEMBER 2026</span>
+            <h3 class="text-xs font-bold text-white mt-1">Phase 4: Final Review</h3>
+            <p class="text-[11px] text-gray-400 mt-1">End-to-End System Audit, Security Hardening &amp; Final Deployment.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 10: Conclusion & Q&A -->
+      <div class="slide flex-col items-center justify-center text-center space-y-6">
+        <span class="px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-mono font-semibold">
+          Review-1 Status: Ready for Evaluation
+        </span>
+        <h2 class="text-4xl font-extrabold text-white">Summary &amp; Deliverables</h2>
+        <div class="flex flex-wrap justify-center gap-3 max-w-2xl text-xs text-gray-300">
+          <span class="px-3 py-1.5 rounded-lg glass-card text-green-400 font-semibold">✓ GitHub REST API Live</span>
+          <span class="px-3 py-1.5 rounded-lg glass-card text-green-400 font-semibold">✓ Jenkins Proxy Connected</span>
+          <span class="px-3 py-1.5 rounded-lg glass-card text-green-400 font-semibold">✓ Telemetry Stream Active</span>
+          <span class="px-3 py-1.5 rounded-lg glass-card text-green-400 font-semibold">✓ Code Pushed to GitHub</span>
+        </div>
+        <p class="text-2xl font-bold text-blue-400 pt-4">Thank You! Open for Q&amp;A</p>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Bottom Navigation Control Bar -->
+  <footer class="h-16 border-t border-gray-800/80 px-8 flex items-center justify-between bg-gray-950/60 backdrop-blur-md">
+    <div class="text-xs text-gray-500 font-mono">
+      Use <kbd class="px-2 py-0.5 rounded bg-gray-800 text-gray-300">←</kbd> <kbd class="px-2 py-0.5 rounded bg-gray-800 text-gray-300">→</kbd> or <kbd class="px-2 py-0.5 rounded bg-gray-800 text-gray-300">Space</kbd> to navigate
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="prevBtn" onclick="prevSlide()" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white text-xs font-semibold disabled:opacity-40 transition">
+        ← Previous
+      </button>
+      <button id="nextBtn" onclick="nextSlide()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition shadow-md shadow-blue-500/20">
+        Next →
+      </button>
+    </div>
+  </footer>
+
+  <script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const slideCounter = document.getElementById('slideCounter');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    function updateSlides() {
+      slides.forEach((s, idx) => {
+        if (idx === currentSlide) s.classList.add('active');
+        else s.classList.remove('active');
+      });
+      slideCounter.innerText = `Slide ${currentSlide + 1} / ${slides.length}`;
+      prevBtn.disabled = currentSlide === 0;
+      if (currentSlide === slides.length - 1) {
+        nextBtn.innerText = 'Finish 🏁';
+      } else {
+        nextBtn.innerText = 'Next →';
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlide < slides.length - 1) {
+        currentSlide++;
+        updateSlides();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 0) {
+        currentSlide--;
+        updateSlides();
+      }
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') nextSlide();
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') prevSlide();
+      if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+    });
+
+    updateSlides();
+  </script>
+</body>
+</html>
