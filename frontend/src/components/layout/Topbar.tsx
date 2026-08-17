@@ -5,7 +5,8 @@ import type { PageId } from '@/types';
 import { pageMeta } from '@/config/navigation';
 import NotificationDrawer from '@/components/ui/NotificationDrawer';
 import ToolIntegrationModal from '@/components/ui/ToolIntegrationModal';
-import { Search, Bell, Moon, Sun, Activity, LogOut, LogIn, ChevronDown, Shield, Plug } from 'lucide-react';
+import EditProfileModal from '@/components/ui/EditProfileModal';
+import { Search, Bell, Moon, Sun, Activity, LogOut, LogIn, ChevronDown, Shield, Plug, User } from 'lucide-react';
 
 interface TopbarProps {
   activePage: PageId;
@@ -18,6 +19,7 @@ export default function Topbar({ activePage, onNavigate }: TopbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [toolsModalOpen, setToolsModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const meta = pageMeta[activePage] || { title: 'Dashboard', description: 'ML DevOps Control Center' };
 
   return (
@@ -106,6 +108,17 @@ export default function Topbar({ activePage, onNavigate }: TopbarProps) {
                   <button
                     onClick={() => {
                       setDropdownOpen(false);
+                      setProfileModalOpen(true);
+                    }}
+                    className="w-full px-4 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
+                  >
+                    <User className="w-3.5 h-3.5 text-primary-400" />
+                    Edit Profile &amp; Role
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
                       if (onNavigate) onNavigate('user-governance');
                     }}
                     className="w-full px-4 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
@@ -144,27 +157,23 @@ export default function Topbar({ activePage, onNavigate }: TopbarProps) {
           ) : (
             <button
               onClick={() => onNavigate && onNavigate('signin')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-md shadow-primary-500/20 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-md shadow-primary-500/20 transition-all"
             >
               <LogIn className="w-3.5 h-3.5" />
-              Sign In
+              <span>Sign In</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Slide-out Notification Drawer */}
-      <NotificationDrawer
-        isOpen={notificationOpen}
-        onClose={() => setNotificationOpen(false)}
-        onNavigate={onNavigate}
-      />
+      {/* Notifications Drawer */}
+      <NotificationDrawer isOpen={notificationOpen} onClose={() => setNotificationOpen(false)} />
 
       {/* Tools Integration Hub Modal */}
-      <ToolIntegrationModal
-        isOpen={toolsModalOpen}
-        onClose={() => setToolsModalOpen(false)}
-      />
+      <ToolIntegrationModal isOpen={toolsModalOpen} onClose={() => setToolsModalOpen(false)} />
+
+      {/* Edit Profile & Role Modal */}
+      <EditProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
     </header>
   );
 }
