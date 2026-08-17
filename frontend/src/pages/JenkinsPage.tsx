@@ -29,7 +29,9 @@ import {
   Terminal,
   Cpu,
   Zap,
+  Plus,
 } from 'lucide-react';
+import CreateJenkinsItemModal from '@/components/ui/CreateJenkinsItemModal';
 
 export default function JenkinsPage() {
   // ── Credentials (env vars → localStorage → empty) ───────────────────────────
@@ -59,6 +61,7 @@ export default function JenkinsPage() {
   const [selectedJob, setSelectedJob] = useState<string>('');
   const [selectedBuild, setSelectedBuild] = useState<number | null>(null);
   const [buildLog, setBuildLog] = useState<string>('');
+  const [createItemOpen, setCreateItemOpen] = useState(false);
 
   // ── Loading states ────────────────────────────────────────────────────────────
   const [loadingPipelines, setLoadingPipelines] = useState(false);
@@ -195,6 +198,16 @@ export default function JenkinsPage() {
     }
   };
 
+  const handleJobCreated = async (newJobName: string) => {
+    try {
+      const data = await fetchJenkinsJobs(url, username, token);
+      setPipelines(data);
+      setSelectedJob(newJobName);
+    } catch {
+      // Ignore refresh error
+    }
+  };
+
   const logLines = buildLog.split('\n');
 
   // ── Connection status badge ───────────────────────────────────────────────────
@@ -247,13 +260,23 @@ export default function JenkinsPage() {
 
         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           {connectionStatus === 'connected' && (
-            <button
-              onClick={() => runConnectionTest(url, username, token)}
-              className="px-3.5 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-all flex items-center gap-1.5"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Refresh</span>
-            </button>
+            <>
+              <button
+                onClick={() => setCreateItemOpen(true)}
+                className="px-3.5 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold shadow-md shadow-orange-500/20 transition-all flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Item</span>
+              </button>
+
+              <button
+                onClick={() => runConnectionTest(url, username, token)}
+                className="px-3.5 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-all flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh</span>
+              </button>
+            </>
           )}
           <button
             onClick={() => setShowConfig(!showConfig)}
@@ -586,6 +609,16 @@ export default function JenkinsPage() {
           </Card>
         </div>
       )}
+
+      {/* Create New Jenkins Item Modal */}
+      <CreateJenkinsItemModal
+        isOpen={createItemOpen}
+        url={url}
+        username={username}
+        token={token}
+        onClose={() => setCreateItemOpen(false)}
+        onSuccess={handleJobCreated}
+      />
     </div>
   );
 }

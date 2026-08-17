@@ -236,3 +236,105 @@ export async function triggerJenkinsBuild(
 
   return true;
 }
+
+// ─── Create New Item / Job ───────────────────────────────────────────────────
+
+export interface CreateJenkinsJobParams {
+  jobName: string;
+  description?: string;
+  jobType: 'pipeline' | 'freestyle';
+  pipelineScript?: string;
+}
+
+export async function createJenkinsJob(
+  url: string,
+  username: string,
+  token: string,
+  params: CreateJenkinsJobParams
+): Promise<boolean> {
+  const base = resolveBase(url);
+
+  // 1. Fetch CSRF crumb header
+  let crumbHeaders: HeadersInit = {};
+  try {
+    const crumbRes = await fetch(`${base}/crumbIssuer/api/json`, {
+      headers: getAuthHeaders(username, token),
+    });
+    if (crumbRes.ok) {
+      const crumbData = await crumbRes.json();
+      if (crumbData.crumbRequestField && crumbData.crumb) {
+        crumbHeaders = { [crumbData.crumbRequestField]: crumbData.crumb };
+      }
+    }
+  } catch {
+    // CSRF protection optional
+  }
+
+  // 2. Generate XML configuration
+  const scriptContent = params.pipelineScript || `pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source repository...'
+            }
+        }
+        stage('Build & Test') {
+            steps {
+                echo 'Executing automated build and test pipeline...'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                echo 'Deploying artifact to target environment...'
+            }
+        }
+    }
+}`;
+
+  const xml = params.jobType === 'pipeline'
+    ? `<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job">
+  <description>${params.description || 'Created from ML DevOps Control Center'}</description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps">
+    <script>${scriptContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</script>
+    <sandbox>true</sandbox>
+  </definition>
+</flow-definition>`
+    : `<?xml version='1.1' encoding='UTF-8'?>
+<project>
+  <description>${params.description || 'Created from ML DevOps Control Center'}</description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <scm class="hudson.scm.NullSCM"/>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders/>
+  <publishers/>
+  <buildWrappers/>
+</project>`;
+
+  // 3. Send POST request to Jenkins createItem
+  const response = await fetch(`${base}/createItem?name=${encodeURIComponent(params.jobName)}`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(username, token),
+      ...crumbHeaders,
+      'Content-Type': 'application/xml',
+    },
+    body: xml,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create item "${params.jobName}": ${response.status} ${response.statusText}`);
+  }
+
+  return true;
+}
+
