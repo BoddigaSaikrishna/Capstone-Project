@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
   const envFrontend = loadEnv(mode, __dirname, '');
   const envRoot = loadEnv(mode, process.cwd(), '');
   const jenkinsTarget = envFrontend.VITE_JENKINS_URL || envRoot.VITE_JENKINS_URL || 'http://localhost:8080';
+  const dockerTarget = envFrontend.VITE_DOCKER_HOST || envRoot.VITE_DOCKER_HOST || 'http://localhost:2375';
 
   return {
     plugins: [react()],
@@ -34,6 +35,13 @@ export default defineConfig(({ mode }) => {
           headers: {
             'ngrok-skip-browser-warning': 'true',
           },
+          secure: false,
+        },
+        // All /docker-proxy/* requests are forwarded to Docker Engine REST API
+        '/docker-proxy': {
+          target: dockerTarget,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/docker-proxy/, ''),
           secure: false,
         },
       },
