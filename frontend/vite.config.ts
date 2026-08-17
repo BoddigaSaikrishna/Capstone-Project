@@ -7,10 +7,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Load env file from frontend directory (__dirname) and process.cwd() fallback
+  // Load env from frontend directory (__dirname) and process.cwd()
   const envFrontend = loadEnv(mode, __dirname, '');
   const envRoot = loadEnv(mode, process.cwd(), '');
-  const jenkinsTarget = envFrontend.VITE_JENKINS_URL || envRoot.VITE_JENKINS_URL || '';
+  const jenkinsTarget = envFrontend.VITE_JENKINS_URL || envRoot.VITE_JENKINS_URL || 'http://localhost:8080';
 
   return {
     plugins: [react()],
@@ -23,23 +23,20 @@ export default defineConfig(({ mode }) => {
       exclude: ['lucide-react'],
     },
     server: {
-      proxy: jenkinsTarget
-        ? {
-            // All /jenkins-proxy/* requests are forwarded to the Jenkins server
-            '/jenkins-proxy': {
-              target: jenkinsTarget,
-              changeOrigin: true,
-              // Strip the /jenkins-proxy prefix before forwarding
-              rewrite: (path) => path.replace(/^\/jenkins-proxy/, ''),
-              // Bypass ngrok browser warning page
-              headers: {
-                'ngrok-skip-browser-warning': 'true',
-              },
-              // Don't verify SSL for ngrok tunnels
-              secure: false,
-            },
-          }
-        : {},
+      proxy: {
+        // All /jenkins-proxy/* requests are forwarded to Jenkins (local or ngrok)
+        '/jenkins-proxy': {
+          target: jenkinsTarget,
+          changeOrigin: true,
+          // Strip the /jenkins-proxy prefix before forwarding
+          rewrite: (path) => path.replace(/^\/jenkins-proxy/, ''),
+          // Bypass ngrok browser warning header
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+          },
+          secure: false,
+        },
+      },
     },
   };
 });
