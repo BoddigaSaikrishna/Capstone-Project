@@ -338,3 +338,74 @@ export async function createJenkinsJob(
   return true;
 }
 
+// ─── Plugins & Nodes API ─────────────────────────────────────────────────────
+
+export interface JenkinsPlugin {
+  shortName: string;
+  longName: string;
+  version: string;
+  active: boolean;
+  enabled: boolean;
+}
+
+export interface JenkinsNode {
+  displayName: string;
+  numExecutors: number;
+  offline: boolean;
+  temporarilyOffline: boolean;
+  idle: boolean;
+  assignedLabels: { name: string }[];
+}
+
+export async function fetchJenkinsPlugins(
+  url: string,
+  username: string,
+  token: string
+): Promise<JenkinsPlugin[]> {
+  const base = resolveBase(url);
+  const response = await fetch(
+    `${base}/pluginManager/api/json?tree=plugins[shortName,longName,version,active,enabled]`,
+    { headers: getAuthHeaders(username, token) }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch plugins: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return (data.plugins || []).map((p: any) => ({
+    shortName: p.shortName,
+    longName: p.longName,
+    version: p.version,
+    active: !!p.active,
+    enabled: !!p.enabled,
+  }));
+}
+
+export async function fetchJenkinsNodes(
+  url: string,
+  username: string,
+  token: string
+): Promise<JenkinsNode[]> {
+  const base = resolveBase(url);
+  const response = await fetch(
+    `${base}/computer/api/json?tree=computer[displayName,numExecutors,offline,temporarilyOffline,idle,assignedLabels[name]]`,
+    { headers: getAuthHeaders(username, token) }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch nodes: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return (data.computer || []).map((c: any) => ({
+    displayName: c.displayName,
+    numExecutors: c.numExecutors || 0,
+    offline: !!c.offline,
+    temporarilyOffline: !!c.temporarilyOffline,
+    idle: !!c.idle,
+    assignedLabels: c.assignedLabels || [],
+  }));
+}
+
+
