@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import {
   AreaChart,
   Area,
@@ -38,6 +39,15 @@ import {
   CheckCircle2,
   XCircle,
   PlayCircle,
+  Github,
+  Box,
+  Cloud,
+  Play,
+  RefreshCw,
+  ArrowRight,
+  Timer,
+  CheckCircle,
+  AlertCircle,
 } from 'lucide-react';
 
 const pieData = [
@@ -55,6 +65,174 @@ const activityIcon: Record<string, typeof Rocket> = {
   health: Activity,
   rollback: XCircle,
 };
+
+// ── 4-Stage Live Pipeline Widget ─────────────────────────────────────────────
+
+type StageStatus = 'idle' | 'running' | 'success' | 'failed';
+
+const STAGES = [
+  { id: 1, tool: 'GitHub',  label: 'Code Push',       icon: Github, color: '#6366f1', duration: '~4s',  commit: 'feat: update inference v2.4' },
+  { id: 2, tool: 'Jenkins', label: 'Build & Test',    icon: Server, color: '#f59e0b', duration: '~48s', commit: 'Build #152 · 42 tests pass' },
+  { id: 3, tool: 'Docker',  label: 'Containerize',    icon: Box,    color: '#0ea5e9', duration: '~22s', commit: 'ml-api:v2.4 pushed to registry' },
+  { id: 4, tool: 'AWS EC2', label: 'Deploy & Launch', icon: Cloud,  color: '#10b981', duration: '~18s', commit: '3 EC2 instances updated' },
+] as const;
+
+const STAGE_DELAYS = [800, 1800, 1400, 1200];
+
+function LivePipelineWidget() {
+  const [statuses, setStatuses] = useState<StageStatus[]>(['success', 'success', 'success', 'success']);
+  const [elapsed, setElapsed] = useState<number[]>([4, 48, 22, 18]);
+  const [running, setRunning] = useState(false);
+  const [runCount, setRunCount] = useState(152);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const triggerRun = () => {
+    if (running) return;
+    setRunning(true);
+    setRunCount((c) => c + 1);
+    setStatuses(['running', 'idle', 'idle', 'idle']);
+    setElapsed([0, 0, 0, 0]);
+    let stageIdx = 0;
+    const advance = () => {
+      if (stageIdx >= STAGES.length) { setRunning(false); return; }
+      const cur = stageIdx;
+      let sec = 0;
+      timerRef.current = setInterval(() => {
+        sec += 1;
+        setElapsed((prev) => { const n = [...prev]; n[cur] = sec; return n; });
+      }, 1000);
+      setTimeout(() => {
+        clearInterval(timerRef.current!);
+        setStatuses((prev) => {
+          const n = [...prev] as StageStatus[];
+          n[cur] = 'success';
+          if (cur + 1 < STAGES.length) n[cur + 1] = 'running';
+          return n;
+        });
+        stageIdx++;
+        advance();
+      }, STAGE_DELAYS[cur]);
+    };
+    advance();
+  };
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  const allDone = statuses.every((s) => s === 'success') && !running;
+  const overallStatus = running ? 'running' : allDone ? 'success' : 'idle';
+
+  const statusColor: Record<StageStatus, string> = {
+    idle: 'border-gray-700 bg-gray-900',
+    running: 'border-blue-500/60 bg-blue-500/5 shadow-lg shadow-blue-500/10',
+    success: 'border-success-500/40 bg-success-500/5',
+    failed: 'border-error-500/40 bg-error-500/5',
+  };
+
+  return (
+    <Card className="border border-gray-200 dark:border-gray-800">
+      <div className="px-5 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-400 border border-indigo-500/20">
+            <GitBranch className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Live 4-Stage Pipeline Monitor</h3>
+            <p className="text-xs text-gray-400">GitHub → Jenkins → Docker → AWS EC2 · Run #{runCount}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
+            overallStatus === 'running' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+            overallStatus === 'success' ? 'bg-success-500/10 text-success-400 border-success-500/20' :
+            'bg-gray-800 text-gray-400 border-gray-700'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              overallStatus === 'running' ? 'bg-blue-400 animate-pulse' :
+              overallStatus === 'success' ? 'bg-success-400' : 'bg-gray-500'
+            }`} />
+            {overallStatus === 'running' ? 'RUNNING' : overallStatus === 'success' ? 'ALL PASSED' : 'IDLE'}
+          </span>
+          <button
+            onClick={triggerRun}
+            disabled={running}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all hover:scale-105 active:scale-95"
+          >
+            {running ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+            {running ? 'Running...' : 'Trigger Run'}
+          </button>
+        </div>
+      </div>
+
+      <div className="p-5">
+        <div className="grid grid-cols-4 gap-3 relative">
+          {STAGES.map((stage, i) => {
+            const status = statuses[i];
+            const Icon = stage.icon;
+            const isRunning = status === 'running';
+            const progress = Math.min((elapsed[i] / (STAGE_DELAYS[i] / 1000)) * 100, 95);
+            return (
+              <div key={stage.id} className="relative">
+                {i < STAGES.length - 1 && (
+                  <div className="absolute -right-2 top-8 z-10">
+                    <ArrowRight className={`w-3.5 h-3.5 transition-colors duration-500 ${
+                      statuses[i] === 'success' ? 'text-success-400' : 'text-gray-700'
+                    }`} />
+                  </div>
+                )}
+                <div className={`rounded-xl border p-4 transition-all duration-300 ${statusColor[status]}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: `${stage.color}18`, border: `1px solid ${stage.color}30` }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color: stage.color }} />
+                    </div>
+                    <div>
+                      {isRunning && <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />}
+                      {status === 'success' && <CheckCircle className="w-3 h-3 text-success-400" />}
+                      {status === 'failed' && <AlertCircle className="w-3 h-3 text-error-400" />}
+                    </div>
+                  </div>
+                  <p className="text-xs font-bold text-gray-100 leading-tight">{stage.tool}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{stage.label}</p>
+                  {isRunning && (
+                    <div className="mt-2.5 h-1 bg-gray-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full"
+                        style={{ width: `${progress}%`, transition: 'width 1s linear' }}
+                      />
+                    </div>
+                  )}
+                  <div className="mt-2.5 flex items-center justify-between text-[10px] text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Timer className="w-2.5 h-2.5" />
+                      {isRunning ? `${elapsed[i]}s` : status === 'success' ? stage.duration : '—'}
+                    </span>
+                    <span>{status === 'idle' ? 'Queued' : status === 'running' ? 'In Progress' : status === 'success' ? '✓ Done' : '✗ Failed'}</span>
+                  </div>
+                  {status === 'success' && stage.commit && (
+                    <p className="mt-2 text-[9px] text-gray-500 font-mono truncate border-t border-gray-800/60 pt-1.5">{stage.commit}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 grid grid-cols-4 gap-4">
+          {[
+            { label: 'Total Runs', value: `${runCount}`, color: 'text-gray-100' },
+            { label: 'Success Rate', value: '96.7%', color: 'text-success-400' },
+            { label: 'Avg Duration', value: '1m 32s', color: 'text-blue-400' },
+            { label: 'Last Triggered', value: running ? 'Just now' : '2 min ago', color: 'text-gray-300' },
+          ].map((s) => (
+            <div key={s.label} className="text-center">
+              <p className={`text-base font-bold font-mono ${s.color}`}>{s.value}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function DashboardPage() {
   const successRate = Math.round((18 / 24) * 100);
@@ -95,6 +273,9 @@ export default function DashboardPage() {
           color="warning"
         />
       </div>
+
+      {/* ── 4-Stage Live Pipeline Widget ─────────────────────────────────────── */}
+      <LivePipelineWidget />
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

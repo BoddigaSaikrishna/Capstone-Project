@@ -1,0 +1,125 @@
+version: '3.8'
+
+# ============================================================
+# docker-compose.generic.yml — Universal App Deployment
+# Works for: ML/Python, React, Node.js, Django, Java Spring
+#
+# Usage:
+#   APP_TYPE=react APP_NAME=my-store APP_PORT=80 \
+#   docker compose -f docker-compose.generic.yml up -d
+# ============================================================
+
+services:
+
+  # ── Your Application (any type) ────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: ${DOCKERFILE:-Dockerfile}          # auto-set by deploy.sh
+    image: ${DOCKER_REGISTRY:-devops-org}/${APP_NAME:-my-app}:${IMAGE_TAG:-latest}
+    container_name: ${APP_NAME:-my-app}
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:${APP_PORT:-8000}"
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_PORT=${APP_PORT:-8000}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:${APP_PORT:-8000}/health || curl -sf http://localhost:${APP_PORT:-8000}/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── DevOps Dashboard (this control center) ─────────────────
+  dashboard:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: devops-platform/control-center:latest
+    container_name: devops-dashboard
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_APP_NAME=${APP_NAME:-my-app}
+      - VITE_APP_PORT=${APP_PORT:-8000}
+      - VITE_JENKINS_URL=http://jenkins:8080
+    networks:
+      - app-network
+
+  # ── Redis Cache / Session Store ─────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: ${APP_NAME:-app}-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── PostgreSQL Database ─────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${APP_NAME:-app}-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepassword}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-appdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Nginx Reverse Proxy (optional, enable if needed) ────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: ${APP_NAME:-app}-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - app-network
+    profiles:
+      - with-proxy            # Only starts if: docker compose --profile with-proxy up
+
+networks:
+  app-network:
+    driver: bridge
+    name: ${APP_NAME:-app}-network
+
+volumes:
+  redis_data:
+    name: ${APP_NAME:-app}_redis
+  postgres_data:
+    name: ${APP_NAME:-app}_postgres

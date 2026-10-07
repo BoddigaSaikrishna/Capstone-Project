@@ -1,0 +1,65 @@
+# ============================================================
+# Dockerfile.node — React / Next.js / Node.js / Express Apps
+# Multi-stage: Build with Node → Serve with Nginx (React)
+#              OR run directly with Node.js (API)
+# Usage: docker build -f Dockerfile.node -t myapp:v1.0 .
+# ============================================================
+
+# ── Stage 1: Build ──────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install deps first (better layer caching)
+COPY package*.json ./
+RUN npm ci --only=production=false
+
+# Copy source and build
+COPY . .
+
+# Build frontend assets if build script exists (React/Next.js)
+# For pure Node.js APIs this is a no-op
+RUN npm run build 2>/dev/null || echo "No build step — Node.js API mode"
+
+# ── Stage 2a: Serve React/Next.js via Nginx ─────────────────
+FROM nginx:1.25-alpine AS frontend
+
+WORKDIR /usr/share/nginx/html
+
+# Remove default nginx static assets
+RUN rm -rf ./*
+
+# Copy built React/Next.js assets
+COPY --from=builder /app/dist ./
+COPY --from=builder /app/build ./ 2>/dev/null || true
+
+# Custom Nginx config for SPA routing
+RUN printf 'server {\n  listen 80;\n  root /usr/share/nginx/html;\n  index index.html;\n  location / { try_files $uri $uri/ /index.html; }\n  location /api { proxy_pass http://backend:3000; }\n}\n' > /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://localhost:80/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
+
+# ── Stage 2b: Node.js API (alternative) ─────────────────────
+# To use this instead, build with: --target api
+FROM node:20-alpine AS api
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY --from=builder /app .
+
+ENV NODE_ENV=production \
+    PORT=3000
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://localhost:3000/health || exit 1
+
+CMD ["node", "server.js"]

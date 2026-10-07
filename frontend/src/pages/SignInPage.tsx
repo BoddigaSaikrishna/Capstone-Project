@@ -107,7 +107,7 @@ export default function SignInPage({ onSuccess }: SignInPageProps) {
               </div>
               <div>
                 <h1 className="text-lg font-bold tracking-tight text-white">ML DevOps</h1>
-                <p className="text-xs font-mono text-primary-400">Control Center v2.4</p>
+                <p className="text-xs font-mono text-primary-400">Control Center</p>
               </div>
             </div>
 
@@ -116,7 +116,7 @@ export default function SignInPage({ onSuccess }: SignInPageProps) {
                 Enterprise AI Infrastructure &amp; Pipeline Governance
               </h2>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Single sign-on gateway for managing Kubernetes deployments, CI/CD builds, and production ML endpoints.
+                Single sign-on gateway for managing cloud infrastructure, CI/CD builds, and production ML endpoints.
               </p>
             </div>
           </div>

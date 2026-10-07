@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # ── Tool 3 & 4: Containerized Machine Learning Application ───────────────────
+  ml-fraud-api:
+    build:
+      context: ./ml_application
+      dockerfile: Dockerfile
+    image: ml-org/fraud-detection-api:v2.4
+    container_name: fraud-detection-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_ENV=production
+      - WORKERS=2
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - mlops-network
+
+  # ── Dashboard Control Center ────────────────────────────────────────────────
+  dashboard-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: mldevops/control-center:latest
+    container_name: mldevops-dashboard
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_JENKINS_URL=http://localhost:8080
+      - VITE_DOCKER_HOST=http://localhost:2375
+    depends_on:
+      - ml-fraud-api
+    networks:
+      - mlops-network
+
+  # ── Redis Model Cache ───────────────────────────────────────────────────────
+  redis-cache:
+    image: redis:7.0-alpine
+    container_name: redis-model-cache
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_cache_persist:/data
+    networks:
+      - mlops-network
+
+  # ── PostgreSQL Feature Store ────────────────────────────────────────────────
+  postgres-feature-store:
+    image: postgres:15-alpine
+    container_name: postgres-ml-features
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: feature_store
+      POSTGRES_USER: mlops_admin
+      POSTGRES_PASSWORD: mlops_secure_password
+    volumes:
+      - postgres_feature_store:/var/lib/postgresql/data
+    networks:
+      - mlops-network
+
+networks:
+  mlops-network:
+    driver: bridge
+    name: mlops-bridge
+
+volumes:
+  redis_cache_persist:
+    name: redis_cache_persist
+  postgres_feature_store:
+    name: postgres_feature_store

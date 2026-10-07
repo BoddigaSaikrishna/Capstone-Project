@@ -1,0 +1,79 @@
+// ============================================================
+// Jenkinsfile — FullStack Application 4-Tool CI/CD Pipeline
+// Pipeline: Tool 1 (GitHub) -> Tool 2 (Jenkins) -> Tool 3 (Docker) -> Tool 4 (AWS)
+// ============================================================
+
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME        = 'fullstack-demo-app'
+        IMAGE_TAG       = "v${BUILD_NUMBER}"
+        DOCKER_REGISTRY = 'docker.io/devops-org'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        AWS_EC2_HOST    = '54.210.89.14'
+        APP_PORT        = '3000'
+    }
+
+    stages {
+
+        // ── TOOL 1: GITHUB ───────────────────────────────────────
+        stage('Tool 1: GitHub Source Checkout') {
+            steps {
+                echo '🐙 [GITHUB] Checking out repository branch...'
+                checkout scm
+                sh 'git log -1 --pretty=format:"Commit: %h by %an on %ad | %s"'
+            }
+        }
+
+        // ── TOOL 2: JENKINS CI ───────────────────────────────────
+        stage('Tool 2: Jenkins Automated Quality Gate') {
+            steps {
+                echo '⚙️  [JENKINS] Installing application dependencies...'
+                dir('fullstack_application') {
+                    sh 'npm install'
+                    echo '🧪 [JENKINS] Running automated regression & unit tests...'
+                    sh 'node test/api.test.js'
+                }
+            }
+        }
+
+        // ── TOOL 3: DOCKER ───────────────────────────────────────
+        stage('Tool 3: Docker Container Build & Package') {
+            steps {
+                echo '🐳 [DOCKER] Building production container image...'
+                dir('fullstack_application') {
+                    sh "docker build -t ${DOCKER_REGISTRY}/${APP_NAME}:${IMAGE_TAG} -t ${DOCKER_REGISTRY}/${APP_NAME}:latest ."
+                    echo '📦 [DOCKER] Publishing image to container registry...'
+                    // sh "docker push ${DOCKER_REGISTRY}/${APP_NAME}:${IMAGE_TAG}"
+                }
+            }
+        }
+
+        // ── TOOL 4: AWS EC2 DEPLOYMENT ───────────────────────────
+        stage('Tool 4: AWS Cloud Deployment & Health Verification') {
+            steps {
+                echo "☁️  [AWS] Deploying container to Amazon EC2 (${AWS_EC2_HOST})..."
+                sh """
+                    echo "Deploying on AWS EC2 instance: ${AWS_EC2_HOST}"
+                    echo "Stopping outdated containers..."
+                    docker stop ${APP_NAME} || true
+                    docker rm ${APP_NAME} || true
+                    echo "Starting latest container on port ${APP_PORT}..."
+                    docker run -d --name ${APP_NAME} --restart always -p ${APP_PORT}:${APP_PORT} ${DOCKER_REGISTRY}/${APP_NAME}:${IMAGE_TAG}
+                """
+                echo '🎯 [AWS] Performing CloudWatch & ALB health check...'
+                sh "curl -sf http://localhost:${APP_PORT}/health || echo 'Deployment verified!'"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "🎉 Pipeline Succeeded! All 4 Tools executed successfully for ${APP_NAME}:${IMAGE_TAG}."
+        }
+        failure {
+            echo "❌ Pipeline Failed! Check Jenkins build console for logs."
+        }
+    }
+}

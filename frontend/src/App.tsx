@@ -17,6 +17,7 @@ import LogsPage from '@/pages/LogsPage';
 import ReportsPage from '@/pages/ReportsPage';
 import UserGovernancePage from '@/pages/UserGovernancePage';
 import SignInPage from '@/pages/SignInPage';
+import CodeGeneratorPage from '@/pages/CodeGeneratorPage';
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
@@ -38,10 +39,11 @@ function AppContent() {
       case 'github': return <GitHubPage />;
       case 'jenkins': return <JenkinsPage />;
       case 'docker': return <DockerPage />;
-      case 'kubernetes': return <KubernetesPage />;
+      case 'kubernetes': return <DashboardPage />;
       case 'aws': return <AWSPage />;
       case 'ml-apps': return <MLApplicationsPage />;
       case 'pipeline': return <PipelinePage />;
+      case 'code-generator': return <CodeGeneratorPage onNavigateToPipeline={() => setPage('pipeline')} />;
       case 'monitoring': return <MonitoringPage />;
       case 'logs': return <LogsPage />;
       case 'reports': return <ReportsPage />;

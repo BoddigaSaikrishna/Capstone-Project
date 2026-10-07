@@ -1,0 +1,19 @@
+{
+  "name": "fullstack-demo-app",
+  "version": "1.0.0",
+  "description": "FullStack Microservice with complete 4-Tool DevOps Integration (GitHub -> Jenkins -> Docker -> AWS)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/api.test.js",
+    "build": "echo 'Build successful for FullStack Application'"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

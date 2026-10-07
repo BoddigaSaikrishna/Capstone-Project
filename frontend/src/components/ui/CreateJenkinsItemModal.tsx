@@ -24,20 +24,58 @@ interface CreateJenkinsItemModalProps {
 
 const DEFAULT_JENKINSFILE = `pipeline {
     agent any
+
+    environment {
+        APP_NAME = 'fraud-detection-api'
+        IMAGE_TAG = 'v2.4.1'
+        DOCKER_REGISTRY = 'docker.io/ml-org'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        AWS_EC2_HOST = '54.210.89.14'
+        ACCURACY_THRESHOLD = '95.0'
+    }
+
     stages {
-        stage('Checkout') {
+        stage('1. GitHub Source Checkout') {
             steps {
-                echo 'Checking out source repository...'
+                echo '[TOOL 1: GITHUB] Pulling ML Application source code...'
+                checkout scm
             }
         }
-        stage('Build & Test') {
+        stage('2. PyTest & Model Lint') {
             steps {
-                echo 'Executing automated build and test pipeline...'
+                echo '[TOOL 2: JENKINS] Running pytest & validating accuracy threshold (>=95%)...'
+                dir('ml_application') {
+                    sh 'python -m pytest test_model.py -v'
+                    sh 'python train.py'
+                }
             }
         }
-        stage('Deploy') {
+        stage('3. Docker Container Build') {
             steps {
-                echo 'Deploying artifact to target environment...'
+                echo '[TOOL 3: DOCKER] Building container image: \${DOCKER_REGISTRY}/\${APP_NAME}:\${IMAGE_TAG}...'
+                dir('ml_application') {
+                    sh 'docker build -t \${DOCKER_REGISTRY}/\${APP_NAME}:\${IMAGE_TAG} .'
+                }
+            }
+        }
+        stage('4. Docker Registry Push') {
+            steps {
+                echo '[TOOL 3: DOCKER] Pushing container image to registry...'
+                sh 'docker push \${DOCKER_REGISTRY}/\${APP_NAME}:\${IMAGE_TAG}'
+            }
+        }
+        stage('5. Deploy to AWS Cloud') {
+            steps {
+                echo '[TOOL 4: AWS] Deploying container to AWS EC2 instance on port 8000...'
+                sh 'docker stop \${APP_NAME} || true && docker rm \${APP_NAME} || true'
+                sh 'docker run -d --name \${APP_NAME} -p 8000:8000 \${DOCKER_REGISTRY}/\${APP_NAME}:\${IMAGE_TAG}'
+            }
+        }
+        stage('6. Smoke Test & Live Inference') {
+            steps {
+                echo '[VERIFY] Testing live model inference endpoint on AWS...'
+                sh 'curl -s -f http://localhost:8000/health'
+                sh 'curl -s -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d "{\\"amount_usd\\": 4850.0, \\"foreign_country\\": true}"'
             }
         }
     }

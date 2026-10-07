@@ -64,6 +64,7 @@ const initialTools: IntegrationTool[] = [
     lastPing: '5m ago',
     version: 'v24.0.7 Engine',
   },
+  /* Temporarily hidden per instructions:
   {
     id: 'kubernetes',
     name: 'Kubernetes Cluster',
@@ -74,6 +75,7 @@ const initialTools: IntegrationTool[] = [
     lastPing: '10s ago',
     version: 'v1.28.4 (3 Nodes)',
   },
+  */
   {
     id: 'aws',
     name: 'AWS Cloud Infrastructure',

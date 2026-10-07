@@ -51,33 +51,35 @@ function toDB(app: Omit<MLApplication, 'id' | 'createdAt'>): Record<string, unkn
 }
 
 export function useMLApplications() {
-  const [apps, setApps] = useState<MLApplication[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [apps, setApps] = useState<MLApplication[]>(seedMLApplications);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchApps = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder.supabase.co') {
         setApps(seedMLApplications);
-        setLoading(false);
         return;
       }
 
-      const { data, error } = await supabase
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase network timeout')), 2500)
+      );
+
+      const fetchPromise = supabase
         .from('ml_applications')
         .select('*')
         .order('created_at', { ascending: false });
 
+      const { data, error } = (await Promise.race([fetchPromise, timeoutPromise])) as any;
+
       if (error) {
         setApps(seedMLApplications);
-        setLoading(false);
         return;
       }
 
       if (!data || data.length === 0) {
-        // Seed the database with initial data
+        // Seed the database with initial data if empty
         const inserts = seedMLApplications.map(({ id, createdAt, ...app }) => toDB(app));
         const { data: seeded, error: seedError } = await supabase
           .from('ml_applications')

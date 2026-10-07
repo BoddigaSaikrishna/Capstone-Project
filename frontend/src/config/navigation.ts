@@ -13,6 +13,7 @@ import {
   FileBarChart,
   ShieldCheck,
   LogIn,
+  Code2,
 } from 'lucide-react';
 
 const iconMap: Record<string, typeof LayoutDashboard> = {
@@ -29,6 +30,7 @@ const iconMap: Record<string, typeof LayoutDashboard> = {
   FileBarChart,
   ShieldCheck,
   LogIn,
+  Code2,
 };
 
 export const navItems: NavItem[] = [
@@ -36,10 +38,11 @@ export const navItems: NavItem[] = [
   { id: 'github', label: 'GitHub', icon: 'Github', group: 'Integrations' },
   { id: 'jenkins', label: 'Jenkins', icon: 'Server', group: 'Integrations' },
   { id: 'docker', label: 'Docker', icon: 'Box', group: 'Integrations' },
-  { id: 'kubernetes', label: 'Kubernetes', icon: 'Ship', group: 'Integrations' },
+  // { id: 'kubernetes', label: 'Kubernetes', icon: 'Ship', group: 'Integrations' },
   { id: 'aws', label: 'AWS', icon: 'Cloud', group: 'Integrations' },
-  { id: 'ml-apps', label: 'ML Applications', icon: 'Brain', group: 'ML Ops' },
+  { id: 'ml-apps', label: 'Applications', icon: 'Brain', group: 'ML Ops' },
   { id: 'pipeline', label: 'Pipeline', icon: 'GitBranch', group: 'ML Ops' },
+  { id: 'code-generator', label: 'Code Generator', icon: 'Code2', group: 'ML Ops' },
   { id: 'monitoring', label: 'Monitoring', icon: 'Activity', group: 'Operations' },
   { id: 'logs', label: 'Logs', icon: 'ScrollText', group: 'Operations' },
   { id: 'reports', label: 'Reports', icon: 'FileBarChart', group: 'Operations' },
@@ -57,7 +60,8 @@ export const pageMeta: Record<PageId, { title: string; description: string }> = 
   docker: { title: 'Docker Module', description: 'Container images and running containers' },
   kubernetes: { title: 'Kubernetes Module', description: 'Deployments, pods, and services' },
   aws: { title: 'AWS Module', description: 'EC2 instances and deployment status' },
-  'ml-apps': { title: 'ML Applications', description: 'Registered machine learning applications and model info' },
+  'ml-apps': { title: 'Applications', description: 'Deployed applications — ML models, APIs, frontends, and microservices' },
+  'code-generator': { title: 'DevOps Code Studio', description: 'Auto-generate Dockerfiles, Jenkinsfiles, Compose configs, and deploy scripts directly in-app' },
   pipeline: { title: 'Pipeline Visualization', description: 'End-to-end deployment pipeline stages' },
   monitoring: { title: 'Monitoring', description: 'System health, CPU, memory, and response times' },
   logs: { title: 'Logs', description: 'Aggregated logs from Jenkins, Docker, deployments, and applications' },

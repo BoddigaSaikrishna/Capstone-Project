@@ -1,0 +1,15 @@
+services:
+  # ── ML Real-Time Fraud Detection Inference API ────────────────────────────────
+  - type: web
+    name: ml-devops-control-center-api
+    runtime: docker
+    dockerfilePath: ./ml_application/Dockerfile
+    dockerContext: ./ml_application
+    plan: free
+    region: oregon
+    envVars:
+      - key: MODEL_ENV
+        value: production
+      - key: WORKERS
+        value: 2
+    healthCheckPath: /health

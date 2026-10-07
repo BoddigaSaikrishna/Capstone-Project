@@ -11,6 +11,7 @@ export type PageId =
   | 'aws'
   | 'ml-apps'
   | 'pipeline'
+  | 'code-generator'
   | 'monitoring'
   | 'logs'
   | 'reports'
@@ -216,7 +217,7 @@ export interface ServiceHealth {
 }
 
 // Logs
-export type LogSource = 'jenkins' | 'docker' | 'deployment' | 'application';
+export type LogSource = 'jenkins' | 'docker' | 'deployment' | 'application' | 'aws' | 'ml-inference';
 export interface LogEntry {
   id: string;
   source: LogSource;

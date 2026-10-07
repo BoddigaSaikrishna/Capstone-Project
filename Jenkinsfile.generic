@@ -1,0 +1,198 @@
+// ============================================================
+// Universal Jenkinsfile — Works for ANY FullStack Application
+// Pipeline: GitHub → Jenkins CI → Docker → AWS EC2
+// Supports: ML/Python, React/Next.js, Node.js, Django, Java
+// ============================================================
+
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'APP_TYPE',
+            choices: ['ml', 'react', 'nodejs', 'django', 'java'],
+            description: 'Select the application type to deploy'
+        )
+        string(name: 'APP_NAME',        defaultValue: 'my-app',              description: 'Application / image name')
+        string(name: 'IMAGE_TAG',       defaultValue: 'latest',              description: 'Docker image tag (e.g. v1.0)')
+        string(name: 'DOCKER_REGISTRY', defaultValue: 'docker.io/devops-org',description: 'Docker registry prefix')
+        string(name: 'APP_PORT',        defaultValue: '8000',                description: 'Container port to expose')
+        string(name: 'AWS_EC2_HOST',    defaultValue: '54.210.89.14',        description: 'Target AWS EC2 IP address')
+    }
+
+    environment {
+        FULL_IMAGE = "${params.DOCKER_REGISTRY}/${params.APP_NAME}:${params.IMAGE_TAG}"
+        AWS_DEFAULT_REGION = 'us-east-1'
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        ansiColor('xterm')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    stages {
+
+        // ── TOOL 1: GITHUB ──────────────────────────────────────────────────────
+        stage('1. GitHub Source Checkout') {
+            steps {
+                echo "======================================================"
+                echo "🐙 [TOOL 1: GITHUB] Pulling source: ${params.APP_NAME}"
+                echo "======================================================"
+                checkout scm
+                sh 'git log -1 --oneline --stat'
+            }
+        }
+
+        // ── TOOL 2: JENKINS — Language-specific CI ─────────────────────────────
+        stage('2. Install Dependencies') {
+            steps {
+                echo "======================================================"
+                echo "⚙️  [TOOL 2: JENKINS] Installing dependencies — ${params.APP_TYPE}"
+                echo "======================================================"
+                script {
+                    switch(params.APP_TYPE) {
+                        case 'ml':
+                        case 'django':
+                            sh 'pip install -r requirements.txt'
+                            break
+                        case 'react':
+                        case 'nodejs':
+                            sh 'npm ci'
+                            break
+                        case 'java':
+                            sh 'mvn dependency:resolve -q'
+                            break
+                    }
+                }
+            }
+        }
+
+        stage('3. Automated Tests') {
+            steps {
+                echo "======================================================"
+                echo "🧪 [TOOL 2: JENKINS] Running tests — ${params.APP_TYPE}"
+                echo "======================================================"
+                script {
+                    switch(params.APP_TYPE) {
+                        case 'ml':
+                            sh 'python -m pytest test_model.py -v --cov=. --cov-report=xml'
+                            sh 'python train.py'
+                            break
+                        case 'django':
+                            sh 'python manage.py test --verbosity=2'
+                            sh 'python manage.py collectstatic --noinput'
+                            break
+                        case 'react':
+                            sh 'npm run test -- --watchAll=false --coverage'
+                            sh 'npm run build'
+                            break
+                        case 'nodejs':
+                            sh 'npm test'
+                            sh 'npm run lint || true'
+                            break
+                        case 'java':
+                            sh 'mvn test jacoco:report'
+                            break
+                    }
+                }
+            }
+        }
+
+        // ── TOOL 3: DOCKER — Build & Push ─────────────────────────────────────
+        stage('4. Docker Image Build') {
+            steps {
+                echo "======================================================"
+                echo "🐳 [TOOL 3: DOCKER] Building image: ${env.FULL_IMAGE}"
+                echo "======================================================"
+                script {
+                    def dockerfileMap = [
+                        ml:      'Dockerfile',
+                        django:  'Dockerfile.django',
+                        react:   'Dockerfile.node',
+                        nodejs:  'Dockerfile.node',
+                        java:    'Dockerfile.java',
+                    ]
+                    def dockerfile = dockerfileMap[params.APP_TYPE] ?: 'Dockerfile'
+                    sh "docker build -f ${dockerfile} -t ${env.FULL_IMAGE} -t ${params.DOCKER_REGISTRY}/${params.APP_NAME}:latest ."
+                    sh "docker images | grep ${params.APP_NAME}"
+                }
+            }
+        }
+
+        stage('5. Docker Registry Push') {
+            steps {
+                echo "======================================================"
+                echo "📦 [TOOL 3: DOCKER] Pushing image to registry"
+                echo "======================================================"
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                    sh "docker push ${env.FULL_IMAGE}"
+                    sh "docker push ${params.DOCKER_REGISTRY}/${params.APP_NAME}:latest"
+                }
+            }
+        }
+
+        // ── TOOL 4: AWS — Deploy to EC2 ───────────────────────────────────────
+        stage('6. AWS EC2 Deployment') {
+            steps {
+                echo "======================================================"
+                echo "☁️  [TOOL 4: AWS] Deploying to EC2: ${params.AWS_EC2_HOST}"
+                echo "======================================================"
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'aws-ec2-ssh-key',
+                    keyFileVariable:  'SSH_KEY',
+                    usernameVariable: 'SSH_USER'
+                )]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -i \$SSH_KEY \$SSH_USER@${params.AWS_EC2_HOST} '
+                            docker pull ${env.FULL_IMAGE}
+                            docker stop ${params.APP_NAME} || true
+                            docker rm   ${params.APP_NAME} || true
+                            docker run -d \\
+                                --name ${params.APP_NAME} \\
+                                --restart always \\
+                                -p ${params.APP_PORT}:${params.APP_PORT} \\
+                                -e APP_ENV=production \\
+                                ${env.FULL_IMAGE}
+                            docker ps | grep ${params.APP_NAME}
+                        '
+                    """
+                }
+            }
+        }
+
+        // ── VERIFICATION ───────────────────────────────────────────────────────
+        stage('7. Health Check & Smoke Test') {
+            steps {
+                echo "======================================================"
+                echo "🎯 [VERIFICATION] Health check on EC2 endpoint"
+                echo "======================================================"
+                sh """
+                    sleep 5
+                    curl -sf http://${params.AWS_EC2_HOST}:${params.APP_PORT}/health || \
+                    curl -sf http://${params.AWS_EC2_HOST}:${params.APP_PORT}/ || \
+                    curl -sf http://${params.AWS_EC2_HOST}:${params.APP_PORT}/actuator/health || \
+                    echo "Health endpoint not found — verify manually."
+                """
+                echo "Pipeline complete: ${params.APP_NAME}:${params.IMAGE_TAG} is live on AWS!"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "DEPLOYMENT SUCCESSFUL — ${params.APP_NAME} (${params.APP_TYPE}) live at http://${params.AWS_EC2_HOST}:${params.APP_PORT}"
+        }
+        failure {
+            echo "Pipeline FAILED — Check stage logs above for details."
+        }
+        always {
+            sh 'docker logout || true'
+        }
+    }
+}
