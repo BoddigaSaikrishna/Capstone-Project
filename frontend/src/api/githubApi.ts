@@ -97,7 +97,11 @@ async function handleApiError(response: Response, context: string): Promise<neve
     throw new Error(`GitHub Resource Not Found (404) for ${context}.`);
   }
   if (response.status === 422) {
-    throw new Error(`Validation Error (422): ${msg}`);
+    const details = Array.isArray(jsonErr.errors)
+      ? jsonErr.errors.map((e: any) => e.message || (e.field ? `${e.field} invalid` : '')).filter(Boolean).join('; ')
+      : '';
+    const fullMsg = details ? `${msg} (${details})` : msg;
+    throw new Error(`Validation Error (422): ${fullMsg}`);
   }
 
   throw new Error(`GitHub API Error (${response.status}): ${msg}`);
