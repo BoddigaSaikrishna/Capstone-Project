@@ -32,7 +32,7 @@ import {
 export default function GitHubPage() {
   // Account state persisted in localStorage
   const [username, setUsername] = useState<string>(() => {
-    return localStorage.getItem('mldevops_github_username') || import.meta.env.VITE_GITHUB_USERNAME || 'torvalds'; // Default to env or famous torvalds
+    return localStorage.getItem('mldevops_github_username') || import.meta.env.VITE_GITHUB_USERNAME || 'BoddigaSaikrishna';
   });
   const [token, setToken] = useState<string>(() => {
     return localStorage.getItem('mldevops_github_token') || import.meta.env.VITE_GITHUB_TOKEN || '';
@@ -254,7 +254,7 @@ export default function GitHubPage() {
             <div className="flex items-center justify-between pt-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">Quick Try Popular Repos:</span>
-                {(['torvalds', 'facebook', 'vercel', 'google'] as const).map((user) => (
+                {(['BoddigaSaikrishna', 'torvalds', 'facebook', 'vercel', 'google'] as const).map((user) => (
                   <button
                     key={user}
                     type="button"
@@ -263,7 +263,11 @@ export default function GitHubPage() {
                       setUsername(user);
                       localStorage.setItem('mldevops_github_username', user);
                     }}
-                    className="px-2 py-1 rounded text-[11px] bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700 font-mono transition-colors"
+                    className={`px-2 py-1 rounded text-[11px] font-mono transition-colors ${
+                      user === 'BoddigaSaikrishna'
+                        ? 'bg-primary-500/20 text-primary-300 font-bold border border-primary-500/30'
+                        : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700'
+                    }`}
                   >
                     @{user}
                   </button>
