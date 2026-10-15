@@ -61,6 +61,7 @@ export default function GitHubPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [triggered, setTriggered] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
   // Clone panel state
   const [cloneTab, setCloneTab] = useState<'local' | 'codespaces'>('local');
@@ -161,7 +162,9 @@ export default function GitHubPage() {
 
   const handleTrigger = () => {
     setTriggered(true);
+    setShowToast(true);
     setTimeout(() => setTriggered(false), 3000);
+    setTimeout(() => setShowToast(false), 4000);
   };
 
   // Clone URL helpers
@@ -191,6 +194,36 @@ export default function GitHubPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+
+      {/* ── Toast Notification ── */}
+      <div
+        className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl shadow-success-500/30 border border-success-500/40 bg-gray-950/95 backdrop-blur-md transition-all duration-500 ${
+          showToast
+            ? 'translate-y-0 opacity-100 pointer-events-auto'
+            : 'translate-y-8 opacity-0 pointer-events-none'
+        }`}
+      >
+        {/* Animated pulse ring */}
+        <div className="relative shrink-0">
+          <div className="w-9 h-9 rounded-full bg-success-500/20 flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5 text-success-400" />
+          </div>
+          <span className="absolute inset-0 rounded-full bg-success-500/30 animate-ping" />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-success-400">Webhook Triggered!</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            Pipeline dispatch sent for <span className="text-success-300 font-semibold">{selectedRepo?.name}</span>
+          </p>
+        </div>
+        {/* Progress bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl overflow-hidden">
+          <div
+            className={`h-full bg-success-500 transition-all ${showToast ? 'w-0 duration-[4000ms]' : 'w-full duration-0'}`}
+            style={{ transitionTimingFunction: 'linear' }}
+          />
+        </div>
+      </div>
 
       {/* ── 1. Top Connection Card ── */}
       <Card className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
