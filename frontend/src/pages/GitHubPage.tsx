@@ -563,30 +563,7 @@ export default function GitHubPage() {
             </div>
           </Card>
 
-          {/* 3. Trigger Webhook */}
-          {selectedRepo && (
-            <Card className="p-5 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  Trigger Webhook for {selectedRepo.name}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Send repository dispatch to target CI/CD pipelines
-                </p>
-              </div>
-
-              <button
-                onClick={handleTrigger}
-                disabled={triggered}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-all disabled:opacity-60"
-              >
-                {triggered ? <CheckCircle2 className="w-4 h-4 text-success-400" /> : <Play className="w-4 h-4 fill-white" />}
-                {triggered ? 'Webhook Triggered!' : 'Trigger Pipeline'}
-              </button>
-            </Card>
-          )}
-
-          {/* 4. Clone Repository Panel */}
+          {/* 3. Clone Repository Panel */}
           {selectedRepo && (
             <Card className="overflow-hidden">
               {/* Header */}
@@ -754,6 +731,29 @@ export default function GitHubPage() {
                   </div>
                 )}
               </div>
+            </Card>
+          )}
+
+          {/* 4. Trigger Webhook */}
+          {selectedRepo && (
+            <Card className="p-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  Trigger Webhook for {selectedRepo.name}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Send repository dispatch to target CI/CD pipelines
+                </p>
+              </div>
+
+              <button
+                onClick={handleTrigger}
+                disabled={triggered}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-all disabled:opacity-60"
+              >
+                {triggered ? <CheckCircle2 className="w-4 h-4 text-success-400" /> : <Play className="w-4 h-4 fill-white" />}
+                {triggered ? 'Webhook Triggered!' : 'Trigger Pipeline'}
+              </button>
             </Card>
           )}
 
