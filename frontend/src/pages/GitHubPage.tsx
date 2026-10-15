@@ -27,6 +27,12 @@ import {
   AlertCircle,
   Sparkles,
   Plus,
+  Copy,
+  Check,
+  Download,
+  Monitor,
+  Terminal,
+  Code2,
 } from 'lucide-react';
 
 export default function GitHubPage() {
@@ -55,6 +61,11 @@ export default function GitHubPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [triggered, setTriggered] = useState(false);
+
+  // Clone panel state
+  const [cloneTab, setCloneTab] = useState<'local' | 'codespaces'>('local');
+  const [cloneProtocol, setCloneProtocol] = useState<'https' | 'ssh' | 'cli'>('https');
+  const [cloneCopied, setCloneCopied] = useState(false);
 
   // 1. Fetch repos when username or token changes
   useEffect(() => {
@@ -151,6 +162,26 @@ export default function GitHubPage() {
   const handleTrigger = () => {
     setTriggered(true);
     setTimeout(() => setTriggered(false), 3000);
+  };
+
+  // Clone URL helpers
+  const getCloneUrl = (repo: RealGitHubRepo | null): string => {
+    if (!repo) return '';
+    if (cloneProtocol === 'https') return repo.html_url + '.git';
+    if (cloneProtocol === 'ssh') return `git@github.com:${repo.full_name}.git`;
+    return `gh repo clone ${repo.full_name}`;
+  };
+
+  const handleCopyCloneUrl = async () => {
+    const url = getCloneUrl(selectedRepo);
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCloneCopied(true);
+      setTimeout(() => setCloneCopied(false), 2000);
+    } catch {
+      /* clipboard not available */
+    }
   };
 
   const filteredRepos = repos.filter((r) =>
@@ -552,6 +583,177 @@ export default function GitHubPage() {
                 {triggered ? <CheckCircle2 className="w-4 h-4 text-success-400" /> : <Play className="w-4 h-4 fill-white" />}
                 {triggered ? 'Webhook Triggered!' : 'Trigger Pipeline'}
               </button>
+            </Card>
+          )}
+
+          {/* 4. Clone Repository Panel */}
+          {selectedRepo && (
+            <Card className="overflow-hidden">
+              {/* Header */}
+              <div className="px-5 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-gray-900 dark:bg-gray-800 text-white">
+                    <Github className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Clone Repository</h3>
+                </div>
+                <a
+                  href={selectedRepo.html_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-primary-400 hover:text-primary-300 flex items-center gap-1 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  View on GitHub
+                </a>
+              </div>
+
+              {/* Local / Codespaces Tab Bar */}
+              <div className="flex border-b border-gray-100 dark:border-gray-800">
+                {(['local', 'codespaces'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setCloneTab(tab)}
+                    className={`px-5 py-2.5 text-xs font-semibold capitalize transition-all border-b-2 ${
+                      cloneTab === tab
+                        ? 'border-primary-500 text-primary-400'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    {tab === 'local' ? 'Local' : 'Codespaces'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="p-5 space-y-4">
+                {cloneTab === 'local' ? (
+                  <>
+                    {/* Protocol Switcher */}
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Clone</p>
+                      <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden w-fit">
+                        {([
+                          { key: 'https', label: 'HTTPS', icon: <Globe className="w-3 h-3" /> },
+                          { key: 'ssh',   label: 'SSH',   icon: <Key className="w-3 h-3" /> },
+                          { key: 'cli',   label: 'GitHub CLI', icon: <Terminal className="w-3 h-3" /> },
+                        ] as const).map(({ key, label, icon }) => (
+                          <button
+                            key={key}
+                            onClick={() => setCloneProtocol(key)}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-semibold transition-all ${
+                              cloneProtocol === key
+                                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
+                                : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }`}
+                          >
+                            {icon}{label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* URL Field */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 relative">
+                        <Code2 className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          readOnly
+                          value={getCloneUrl(selectedRepo)}
+                          className="input pl-8 pr-3 py-2 text-[11px] font-mono bg-gray-50 dark:bg-gray-800/60 cursor-text"
+                          onFocus={(e) => e.target.select()}
+                        />
+                      </div>
+                      <button
+                        onClick={handleCopyCloneUrl}
+                        title="Copy URL"
+                        className={`p-2.5 rounded-lg border transition-all shrink-0 ${
+                          cloneCopied
+                            ? 'bg-success-500/10 border-success-500/40 text-success-500'
+                            : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary-400 hover:border-primary-500/50'
+                        }`}
+                      >
+                        {cloneCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-gray-400">
+                      {cloneProtocol === 'https' && 'Clone using the web URL.'}
+                      {cloneProtocol === 'ssh' && 'Use a password-protected SSH key.'}
+                      {cloneProtocol === 'cli' && 'Work fast with the official GitHub CLI.'}
+                    </p>
+
+                    {/* Divider */}
+                    <div className="border-t border-gray-100 dark:border-gray-800" />
+
+                    {/* Quick Actions */}
+                    <div className="space-y-2">
+                      <a
+                        href={`https://github.com/codespaces/new?hide_repo_select=true&ref=${selectedRepo.default_branch}&repo=${selectedRepo.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-3 w-full p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-primary-500/50 hover:bg-primary-500/5 transition-all group"
+                      >
+                        <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 group-hover:bg-primary-500/10 group-hover:text-primary-400 transition-colors">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 group-hover:text-primary-400 transition-colors">
+                          Open in GitHub Copilot app
+                        </span>
+                        <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-400 ml-auto transition-colors" />
+                      </a>
+
+                      <a
+                        href={`x-github-client://openRepo/${selectedRepo.html_url}`}
+                        className="flex items-center gap-3 w-full p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-primary-500/50 hover:bg-primary-500/5 transition-all group"
+                      >
+                        <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 group-hover:bg-primary-500/10 group-hover:text-primary-400 transition-colors">
+                          <Monitor className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 group-hover:text-primary-400 transition-colors">
+                          Open with GitHub Desktop
+                        </span>
+                        <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-400 ml-auto transition-colors" />
+                      </a>
+
+                      <a
+                        href={`${selectedRepo.html_url}/archive/refs/heads/${selectedRepo.default_branch}.zip`}
+                        download
+                        className="flex items-center gap-3 w-full p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-primary-500/50 hover:bg-primary-500/5 transition-all group"
+                      >
+                        <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 group-hover:bg-primary-500/10 group-hover:text-primary-400 transition-colors">
+                          <Download className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 group-hover:text-primary-400 transition-colors">
+                          Download ZIP
+                        </span>
+                        <Download className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-400 ml-auto transition-colors" />
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  /* Codespaces tab */
+                  <div className="py-8 flex flex-col items-center gap-3 text-center">
+                    <div className="p-3 rounded-xl bg-primary-500/10 text-primary-400">
+                      <Sparkles className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">Create a Codespace</p>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 max-w-xs">
+                        Develop fully in the cloud with a pre-configured environment for <span className="font-semibold text-primary-400">{selectedRepo.name}</span>.
+                      </p>
+                    </div>
+                    <a
+                      href={`https://github.com/codespaces/new?hide_repo_select=true&ref=${selectedRepo.default_branch}&repo=${selectedRepo.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 px-5 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-all shadow-md shadow-primary-500/20 flex items-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Create codespace on {selectedRepo.default_branch}
+                    </a>
+                  </div>
+                )}
+              </div>
             </Card>
           )}
 
