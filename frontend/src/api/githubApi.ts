@@ -224,3 +224,82 @@ export async function createRepoBranch(
 
   return true;
 }
+
+// ─── Delete a GitHub Repository ──────────────────────────────────────────────
+
+export async function deleteGitHubRepo(
+  owner: string,
+  repo: string,
+  token: string
+): Promise<void> {
+  const headers = getHeaders(token);
+
+  const response = await fetch(
+    `${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+    {
+      method: 'DELETE',
+      headers,
+    }
+  );
+
+  // 204 No Content = success
+  if (response.status === 204) return;
+
+  if (!response.ok) {
+    await handleApiError(response, `deletion of repository "${repo}"`);
+  }
+}
+
+// ─── Repository File Browser (Contents API) ──────────────────────────────────
+
+export interface GitHubContentItem {
+  name: string;
+  path: string;
+  type: 'file' | 'dir' | 'symlink' | 'submodule';
+  size: number;
+  sha: string;
+  html_url: string;
+  download_url: string | null;
+}
+
+export async function fetchRepoContents(
+  owner: string,
+  repo: string,
+  path: string = '',
+  token?: string
+): Promise<GitHubContentItem[]> {
+  const headers = getHeaders(token);
+  const encoded = path ? `/${path.split('/').map(encodeURIComponent).join('/')}` : '';
+  const response = await fetch(
+    `${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents${encoded}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    await handleApiError(response, `contents of "${owner}/${repo}/${path}"`);
+  }
+
+  const data = await response.json();
+  // The API returns an array for directories, single object for files
+  return Array.isArray(data) ? data : [data];
+}
+
+export async function fetchFileContent(
+  owner: string,
+  repo: string,
+  path: string,
+  token?: string
+): Promise<string> {
+  const headers = { ...getHeaders(token), Accept: 'application/vnd.github.v3.raw' };
+  const encoded = path.split('/').map(encodeURIComponent).join('/');
+  const response = await fetch(
+    `${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encoded}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    await handleApiError(response, `file content of "${path}"`);
+  }
+
+  return response.text();
+}

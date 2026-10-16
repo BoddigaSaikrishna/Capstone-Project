@@ -5,9 +5,13 @@ import {
   fetchUserRepos,
   fetchRepoBranches,
   fetchRepoCommits,
+  deleteGitHubRepo,
+  fetchRepoContents,
+  fetchFileContent,
   RealGitHubRepo,
   RealGitHubBranch,
   RealGitHubCommit,
+  GitHubContentItem,
 } from '@/api/githubApi';
 import { formatRelative } from '@/utils/format';
 import {
@@ -33,6 +37,13 @@ import {
   Monitor,
   Terminal,
   Code2,
+  Trash2,
+  X,
+  Folder,
+  FileText,
+  ChevronRight,
+  FileCode2,
+  ArrowLeft,
 } from 'lucide-react';
 
 export default function GitHubPage() {
@@ -63,10 +74,24 @@ export default function GitHubPage() {
   const [triggered, setTriggered] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
+  // Delete repo state
+  const [repoToDelete, setRepoToDelete] = useState<RealGitHubRepo | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
   // Clone panel state
   const [cloneTab, setCloneTab] = useState<'local' | 'codespaces'>('local');
   const [cloneProtocol, setCloneProtocol] = useState<'https' | 'ssh' | 'cli'>('https');
   const [cloneCopied, setCloneCopied] = useState(false);
+
+  // File browser state
+  const [currentPath, setCurrentPath] = useState('');
+  const [contents, setContents] = useState<GitHubContentItem[]>([]);
+  const [loadingContents, setLoadingContents] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<GitHubContentItem | null>(null);
+  const [fileContent, setFileContent] = useState<string | null>(null);
+  const [loadingFile, setLoadingFile] = useState(false);
 
   // 1. Fetch repos when username or token changes
   useEffect(() => {
@@ -141,12 +166,51 @@ export default function GitHubPage() {
     };
   }, [selectedRepo, token]);
 
+  // 3. Fetch repo file contents when selectedRepo or currentPath changes
+  useEffect(() => {
+    let isMounted = true;
+    setSelectedFile(null);
+    setFileContent(null);
+    if (!selectedRepo) { setContents([]); return; }
+    const [owner, repoName] = selectedRepo.full_name.split('/');
+    setLoadingContents(true);
+    fetchRepoContents(owner, repoName, currentPath, token.trim() || undefined)
+      .then((data) => { if (isMounted) setContents(data); })
+      .catch(() => { if (isMounted) setContents([]); })
+      .finally(() => { if (isMounted) setLoadingContents(false); });
+    return () => { isMounted = false; };
+  }, [selectedRepo, currentPath, token]);
+
   // Modals state
   const [createRepoOpen, setCreateRepoOpen] = useState(false);
 
   const handleCreateRepo = (newRepo: RealGitHubRepo) => {
     setRepos((prev) => [newRepo, ...prev]);
     setSelectedRepo(newRepo);
+    setCurrentPath('');
+  };
+
+  // Reset path when manually selecting repo
+  const handleSelectRepo = (repo: RealGitHubRepo) => {
+    setSelectedRepo(repo);
+    setCurrentPath('');
+  };
+
+  // Open a file and fetch its content
+  const handleOpenFile = async (item: GitHubContentItem) => {
+    if (!selectedRepo) return;
+    setSelectedFile(item);
+    setFileContent(null);
+    setLoadingFile(true);
+    const [owner, repoName] = selectedRepo.full_name.split('/');
+    try {
+      const text = await fetchFileContent(owner, repoName, item.path, token.trim() || undefined);
+      setFileContent(text);
+    } catch {
+      setFileContent('// Could not load file content.');
+    } finally {
+      setLoadingFile(false);
+    }
   };
 
   // Save new account connection settings
@@ -165,6 +229,26 @@ export default function GitHubPage() {
     setShowToast(true);
     setTimeout(() => setTriggered(false), 3000);
     setTimeout(() => setShowToast(false), 4000);
+  };
+
+  // Delete repo handler
+  const handleDeleteRepo = async () => {
+    if (!repoToDelete || !token.trim()) return;
+    if (deleteConfirmName !== repoToDelete.name) return;
+    const [owner] = repoToDelete.full_name.split('/');
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      await deleteGitHubRepo(owner, repoToDelete.name, token.trim());
+      setRepos((prev) => prev.filter((r) => r.id !== repoToDelete.id));
+      if (selectedRepo?.id === repoToDelete.id) setSelectedRepo(null);
+      setRepoToDelete(null);
+      setDeleteConfirmName('');
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to delete repository.');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   // Clone URL helpers
@@ -407,45 +491,60 @@ export default function GitHubPage() {
                 </div>
               ) : filteredRepos.length > 0 ? (
                 filteredRepos.map((repo) => (
-                  <button
-                    key={repo.id}
-                    onClick={() => setSelectedRepo(repo)}
-                    className={`w-full text-left p-3 rounded-xl border transition-all ${selectedRepo?.id === repo.id
-                      ? 'border-primary-500 bg-primary-500/10 text-primary-400 shadow-md shadow-primary-500/10'
-                      : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900/60'
-                      }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
-                        {repo.name}
-                      </span>
-                      {repo.private ? (
-                        <Lock className="w-3 h-3 text-warning-500" />
-                      ) : (
-                        <Globe className="w-3 h-3 text-gray-400" />
-                      )}
-                    </div>
-
-                    {repo.description && (
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mb-2">
-                        {repo.description}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
-                      <span className="flex items-center gap-1 font-mono">
-                        <Star className="w-3 h-3 text-warning-500" />
-                        {repo.stargazers_count}
-                      </span>
-                      {repo.language && (
-                        <span className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-primary-500" />
-                          {repo.language}
+                  <div key={repo.id} className="relative group/repo">
+                    <button
+                      onClick={() => handleSelectRepo(repo)}
+                      className={`w-full text-left p-3 rounded-xl border transition-all ${selectedRepo?.id === repo.id
+                        ? 'border-primary-500 bg-primary-500/10 text-primary-400 shadow-md shadow-primary-500/10'
+                        : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900/60'
+                        }`}
+                    >
+                      <div className="flex items-center justify-between mb-1 pr-6">
+                        <span className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
+                          {repo.name}
                         </span>
+                        {repo.private ? (
+                          <Lock className="w-3 h-3 text-warning-500" />
+                        ) : (
+                          <Globe className="w-3 h-3 text-gray-400" />
+                        )}
+                      </div>
+
+                      {repo.description && (
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mb-2">
+                          {repo.description}
+                        </p>
                       )}
-                      <span className="ml-auto text-[10px]">{formatRelative(repo.updated_at)}</span>
-                    </div>
-                  </button>
+
+                      <div className="flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center gap-1 font-mono">
+                          <Star className="w-3 h-3 text-warning-500" />
+                          {repo.stargazers_count}
+                        </span>
+                        {repo.language && (
+                          <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-primary-500" />
+                            {repo.language}
+                          </span>
+                        )}
+                        <span className="ml-auto text-[10px]">{formatRelative(repo.updated_at)}</span>
+                      </div>
+                    </button>
+
+                    {/* Delete button — appears on hover */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmName('');
+                        setDeleteError('');
+                        setRepoToDelete(repo);
+                      }}
+                      title="Delete repository"
+                      className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover/repo:opacity-100 transition-all bg-error-500/10 hover:bg-error-500/20 text-error-400 hover:text-error-300 border border-transparent hover:border-error-500/30"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ))
               ) : (
                 <div className="py-12 text-center text-xs text-gray-400">
@@ -596,7 +695,159 @@ export default function GitHubPage() {
             </div>
           </Card>
 
-          {/* 3. Clone Repository Panel */}
+          {/* 3. File Browser */}
+          {selectedRepo && (
+            <Card className="overflow-hidden">
+              {/* Header */}
+              <div className="px-5 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-primary-500/10 text-primary-400">
+                    <Folder className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">File Browser</h3>
+                    <p className="text-[10px] text-gray-400 font-mono truncate max-w-[200px]">
+                      {selectedRepo.name}/{currentPath || ''}
+                    </p>
+                  </div>
+                </div>
+                {loadingContents && <RefreshCw className="w-4 h-4 animate-spin text-primary-400" />}
+              </div>
+
+              {/* Breadcrumb */}
+              <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1 flex-wrap text-[11px] font-mono">
+                <button
+                  onClick={() => { setCurrentPath(''); setSelectedFile(null); }}
+                  className="text-primary-400 hover:text-primary-300 font-semibold transition-colors"
+                >
+                  {selectedRepo.name}
+                </button>
+                {currentPath.split('/').filter(Boolean).map((part, i, arr) => {
+                  const pathUpTo = arr.slice(0, i + 1).join('/');
+                  return (
+                    <span key={i} className="flex items-center gap-1">
+                      <ChevronRight className="w-3 h-3 text-gray-400" />
+                      <button
+                        onClick={() => { setCurrentPath(pathUpTo); setSelectedFile(null); }}
+                        className={`transition-colors ${
+                          i === arr.length - 1
+                            ? 'text-gray-900 dark:text-gray-100 font-semibold'
+                            : 'text-primary-400 hover:text-primary-300'
+                        }`}
+                      >
+                        {part}
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+
+              {selectedFile ? (
+                /* ── File Viewer ── */
+                <div>
+                  <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedFile(null)}
+                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <FileCode2 className="w-3.5 h-3.5 text-primary-400" />
+                      <span className="text-xs font-mono font-semibold text-gray-900 dark:text-gray-100">{selectedFile.name}</span>
+                      <span className="text-[10px] text-gray-400">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                    <a
+                      href={selectedFile.html_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-primary-400 hover:text-primary-300 flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" /> View on GitHub
+                    </a>
+                  </div>
+                  {loadingFile ? (
+                    <div className="py-10 text-center text-xs text-gray-400">
+                      <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-primary-400" />
+                      Loading file...
+                    </div>
+                  ) : (
+                    <pre className="p-4 text-[11px] font-mono text-gray-800 dark:text-gray-200 bg-gray-950/40 overflow-auto max-h-[420px] leading-relaxed whitespace-pre-wrap break-all">
+                      {fileContent}
+                    </pre>
+                  )}
+                </div>
+              ) : (
+                /* ── Directory Listing ── */
+                <div className="divide-y divide-gray-100 dark:divide-gray-800/60 max-h-[400px] overflow-y-auto">
+                  {/* Back row */}
+                  {currentPath && (
+                    <button
+                      onClick={() => {
+                        const parts = currentPath.split('/').filter(Boolean);
+                        parts.pop();
+                        setCurrentPath(parts.join('/'));
+                        setSelectedFile(null);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-gray-400" />
+                      <span className="text-xs text-gray-500 font-mono">..</span>
+                    </button>
+                  )}
+
+                  {loadingContents && contents.length === 0 ? (
+                    <div className="py-10 text-center text-xs text-gray-400">
+                      <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-primary-400" />
+                      Loading files...
+                    </div>
+                  ) : (
+                    [...contents]
+                      .sort((a, b) => {
+                        if (a.type === b.type) return a.name.localeCompare(b.name);
+                        return a.type === 'dir' ? -1 : 1;
+                      })
+                      .map((item) => (
+                        <button
+                          key={item.sha + item.path}
+                          onClick={() =>
+                            item.type === 'dir'
+                              ? (setCurrentPath(item.path), setSelectedFile(null))
+                              : handleOpenFile(item)
+                          }
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-primary-500/5 hover:border-l-2 hover:border-primary-500 transition-all group text-left"
+                        >
+                          {item.type === 'dir' ? (
+                            <Folder className="w-4 h-4 text-primary-400 shrink-0" />
+                          ) : (
+                            <FileText className="w-4 h-4 text-gray-400 group-hover:text-primary-400 shrink-0 transition-colors" />
+                          )}
+                          <span className={`text-xs font-mono truncate ${
+                            item.type === 'dir'
+                              ? 'font-semibold text-gray-900 dark:text-gray-100'
+                              : 'text-gray-700 dark:text-gray-300 group-hover:text-primary-400'
+                          } transition-colors`}>
+                            {item.name}
+                          </span>
+                          {item.type === 'file' && (
+                            <span className="ml-auto text-[10px] text-gray-400 font-mono shrink-0">
+                              {item.size > 1024 ? `${(item.size / 1024).toFixed(1)} KB` : `${item.size} B`}
+                            </span>
+                          )}
+                          <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-primary-400 ml-auto shrink-0 transition-colors" />
+                        </button>
+                      ))
+                  )}
+
+                  {!loadingContents && contents.length === 0 && (
+                    <div className="py-10 text-center text-xs text-gray-400">This folder is empty.</div>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* 4. Clone Repository Panel */}
           {selectedRepo && (
             <Card className="overflow-hidden">
               {/* Header */}
