@@ -2388,41 +2388,7 @@ export default function DockerPage() {
             </span>
           )}
 
-          {/* Mode Switcher Pill */}
-          <div className="flex items-center bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs ml-1">
-            <button
-              type="button"
-              onClick={() => {
-                setIsDemoMode(false);
-                connect();
-              }}
-              className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                !isDemoMode && connected
-                  ? 'bg-success-600 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
-              }`}
-            >
-              Live Engine
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsDemoMode(true);
-                setSysInfo(mockDockerSystemInfo);
-                setContainers(mockDockerContainers);
-                setImages(mockDockerImages);
-                setVolumes(mockDockerVolumes);
-                setNetworks(mockDockerNetworks);
-              }}
-              className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 ${
-                isDemoMode
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
-              }`}
-            >
-              <Sparkles className="w-3 h-3" /> Demo Mode
-            </button>
-          </div>
+
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -2484,24 +2450,6 @@ export default function DockerPage() {
         </div>
       </div>
 
-      {/* ── Demo / Simulation Mode Banner ─────────────────────────────────── */}
-      {isDemoMode && connected === false && (
-        <div className="bg-primary-500/5 border border-primary-500/20 rounded-xl p-4 flex items-start gap-3">
-          <Sparkles className="w-5 h-5 text-primary-400 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-primary-300 space-y-1">
-            <div className="flex items-center gap-2">
-              <p className="font-semibold text-primary-200">Interactive MLOps Demo Mode Active</p>
-              <span className="text-[10px] bg-primary-500/20 text-primary-300 px-2 py-0.5 rounded-full font-mono font-bold">
-                6 Active Microservices
-              </span>
-            </div>
-            <p className="text-xs text-primary-400 leading-relaxed">
-              Docker TCP API (<code className="text-primary-300 font-mono">localhost:2375</code>) is offline. You have full interactive control: <strong>Start/Stop/Restart</strong> containers, stream <strong>Live Logs & Telemetry Stats</strong>, <strong>Deploy Stacks</strong>, and <strong>Build Dockerfiles</strong>.
-              To connect a live engine, enable "Expose daemon on tcp://localhost:2375" in Docker Desktop and click <em>Live Engine</em>.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* ── Stat Cards ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
