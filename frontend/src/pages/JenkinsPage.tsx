@@ -341,6 +341,17 @@ export default function JenkinsPage() {
         </div>
       </Card>
 
+      {/* ── Connection Status Notice ── */}
+      {connectionStatus === 'error' && connectionError && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs animate-fade-in">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+          <div className="space-y-1">
+            <p className="font-semibold text-amber-400">Jenkins Connection Status</p>
+            <p className="text-gray-300 leading-relaxed">{connectionError}</p>
+          </div>
+        </div>
+      )}
+
       {/* ── 2. Navigation Tabs Bar ── */}
       {connectionStatus === 'connected' && (
         <div className="flex items-center border-b border-gray-200 dark:border-gray-800 gap-1 overflow-x-auto">
@@ -437,6 +448,13 @@ export default function JenkinsPage() {
                 </div>
               </div>
             </div>
+
+            {connectionStatus === 'error' && connectionError && (
+              <div className="p-3 rounded-lg bg-error-500/10 border border-error-500/20 text-error-400 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{connectionError}</span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-2">
               <span className="text-[11px] text-gray-400">

@@ -44,17 +44,25 @@ function getAuthHeaders(username: string, token: string): HeadersInit {
 
 /**
  * Resolve the base URL for Jenkins API calls.
- * - In development: use the Vite proxy at /jenkins-proxy (avoids CORS)
- * - If a custom URL is provided by the user (not same as env), use it directly
+ * - In local development: use the Vite proxy at /jenkins-proxy for localhost / 127.0.0.1 (avoids CORS)
+ * - If a custom URL is provided by the user, use it directly (or via proxy in dev)
  */
 function resolveBase(url: string): string {
-  const envUrl = (import.meta.env.VITE_JENKINS_URL || '').replace(/\/$/, '');
-  const inputUrl = url.replace(/\/$/, '');
-  // If the URL matches the env-configured URL, use the Vite proxy path
-  if (!inputUrl || inputUrl === envUrl) {
-    return '/jenkins-proxy';
+  const inputUrl = (url || '').trim().replace(/\/$/, '');
+  const envUrl = (import.meta.env.VITE_JENKINS_URL || '').trim().replace(/\/$/, '');
+  const isDev = import.meta.env.DEV;
+
+  // In local development, always use /jenkins-proxy for localhost to eliminate CORS errors
+  if (isDev) {
+    if (!inputUrl || inputUrl.includes('localhost') || inputUrl.includes('127.0.0.1') || inputUrl === envUrl) {
+      return '/jenkins-proxy';
+    }
   }
-  // Otherwise use the URL directly (user has entered a custom one)
+
+  if (!inputUrl || inputUrl === envUrl) {
+    return isDev ? '/jenkins-proxy' : (envUrl || inputUrl);
+  }
+
   return inputUrl;
 }
 
@@ -73,24 +81,43 @@ export async function testJenkinsConnection(
   token: string
 ): Promise<JenkinsServerInfo> {
   const base = resolveBase(url);
-  const response = await fetch(`${base}/api/json?tree=nodeName,numExecutors,description`, {
-    headers: getAuthHeaders(username, token),
-  });
+  try {
+    const response = await fetch(`${base}/api/json?tree=nodeName,numExecutors,description`, {
+      headers: getAuthHeaders(username, token),
+    });
 
-  if (!response.ok) {
-    if (response.status === 401) throw new Error('Authentication failed — check username and API token.');
-    if (response.status === 403) throw new Error('Access denied — your token lacks permissions.');
-    throw new Error(`Jenkins responded with ${response.status}: ${response.statusText}`);
+    if (!response.ok) {
+      if (response.status === 401) throw new Error('Authentication failed (401) — check your username and API token.');
+      if (response.status === 403) throw new Error('Access denied (403) — user lacks API permissions or CSRF crumb.');
+      if (response.status === 404) throw new Error(`Jenkins API endpoint not found (404) at ${base}. Check your URL.`);
+      throw new Error(`Jenkins responded with HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Endpoint did not return Jenkins JSON data (received ${contentType || 'non-JSON'}).`);
+    }
+
+    const data = await response.json();
+    const version = response.headers.get('X-Jenkins') || response.headers.get('x-jenkins') || 'Unknown';
+    return {
+      version,
+      nodeName: data.nodeName || 'Jenkins Master',
+      numExecutors: data.numExecutors ?? 0,
+      description: data.description || null,
+    };
+  } catch (err: any) {
+    if (err?.message?.includes('Failed to fetch') || err?.name === 'TypeError') {
+      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      if (isHttps && (url.startsWith('http:') || url.includes('localhost') || url.includes('127.0.0.1'))) {
+        throw new Error(
+          'Browser blocked connection: The live HTTPS site (Vercel) cannot access insecure HTTP localhost (Mixed Content & CORS). To connect your local Jenkins, run the project locally (http://localhost:5173) or expose Jenkins with an HTTPS tunnel (e.g., ngrok http 8080).'
+        );
+      }
+      throw new Error(`Cannot reach Jenkins at ${url}. Check if Jenkins is running and network/CORS is allowed.`);
+    }
+    throw err;
   }
-
-  const data = await response.json();
-  const version = response.headers.get('X-Jenkins') || 'Unknown';
-  return {
-    version,
-    nodeName: data.nodeName || 'Jenkins Master',
-    numExecutors: data.numExecutors ?? 0,
-    description: data.description || null,
-  };
 }
 
 // ─── Fetch Jobs ───────────────────────────────────────────────────────────────
