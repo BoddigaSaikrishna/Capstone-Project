@@ -35,14 +35,6 @@ import {
   getContainerName,
   getContainerPorts,
   mapDockerState,
-  mockDockerSystemInfo,
-  mockDockerContainers,
-  mockDockerImages,
-  mockDockerVolumes,
-  mockDockerNetworks,
-  mockDockerDiskUsage,
-  getMockContainerLogs,
-  getMockContainerStats,
   type DockerContainer,
   type DockerImage,
   type DockerVolume,
@@ -159,21 +151,15 @@ function LogModal({
   const logRef = useRef<HTMLPreElement>(null);
 
   const load = useCallback(async () => {
-    if (isDemoMode) {
-      setLogs(getMockContainerLogs(containerName));
-      setTimeout(() => logRef.current?.scrollTo(0, logRef.current.scrollHeight), 50);
-      return;
-    }
     try {
       const text = await fetchContainerLogs(containerId, tail);
       setLogs(text || '(No output)');
       setTimeout(() => logRef.current?.scrollTo(0, logRef.current.scrollHeight), 50);
-    } catch {
-      // Fallback gracefully to realistic demo logs
-      setLogs(getMockContainerLogs(containerName));
+    } catch (err: any) {
+      setLogs(`Unable to fetch logs: ${err?.message || 'Container logs unavailable'}`);
       setTimeout(() => logRef.current?.scrollTo(0, logRef.current.scrollHeight), 50);
     }
-  }, [containerId, containerName, tail, isDemoMode]);
+  }, [containerId, tail]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -299,21 +285,17 @@ function StatsPopover({
   useEffect(() => {
     let active = true;
     const poll = async () => {
-      if (isDemoMode) {
-        if (active) setStats(getMockContainerStats(containerId));
-        return;
-      }
       try {
         const s = await fetchContainerStats(containerId);
         if (active) setStats(s);
       } catch {
-        if (active) setStats(getMockContainerStats(containerId));
+        if (active) setStats(null);
       }
     };
     poll();
     const t = setInterval(poll, 2500);
     return () => { active = false; clearInterval(t); };
-  }, [containerId, isDemoMode]);
+  }, [containerId]);
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
@@ -2087,21 +2069,20 @@ CMD ["./server"]`;
 }
 
 // ─── Docker System Disk Usage Card ─────────────────────────────────────────────
-function DiskUsageCard({ connected, isDemoMode }: { connected: boolean; isDemoMode?: boolean }) {
+function DiskUsageCard({ connected }: { connected: boolean }) {
   const [usage, setUsage] = useState<DockerDiskUsage | null>(null);
 
   useEffect(() => {
-    if (isDemoMode) {
-      setUsage(mockDockerDiskUsage);
+    if (!connected) {
+      setUsage(null);
       return;
     }
-    if (!connected) return;
     fetchDockerDiskUsage()
       .then(setUsage)
-      .catch(() => setUsage(mockDockerDiskUsage));
-  }, [connected, isDemoMode]);
+      .catch(() => setUsage(null));
+  }, [connected]);
 
-  if ((!connected && !isDemoMode) || !usage) return null;
+  if (!connected || !usage) return null;
 
   const imagesTotal = usage.Images?.reduce((s, i) => s + (i.Size || 0), 0) || 0;
   const containersTotal = usage.Containers?.reduce((s, c) => s + (c.SizeRw || 0), 0) || 0;
@@ -2195,13 +2176,12 @@ export default function DockerPage() {
     } catch (e: any) {
       setConnected(false);
       setConnectError(e.message || 'Docker TCP endpoint (localhost:2375) unreachable');
-      // Automatically activate rich demo mode so dashboard is always active
-      setIsDemoMode(true);
-      setSysInfo(mockDockerSystemInfo);
-      setContainers(mockDockerContainers);
-      setImages(mockDockerImages);
-      setVolumes(mockDockerVolumes);
-      setNetworks(mockDockerNetworks);
+      setIsDemoMode(false);
+      setSysInfo(null);
+      setContainers([]);
+      setImages([]);
+      setVolumes([]);
+      setNetworks([]);
     } finally {
       setConnecting(false);
     }
@@ -2216,12 +2196,15 @@ export default function DockerPage() {
         fetchDockerVolumes(),
         fetchDockerNetworks(),
       ]);
-      setContainers(c);
-      setImages(i);
-      setVolumes(v);
-      setNetworks(n);
+      setContainers(c || []);
+      setImages(i || []);
+      setVolumes(v || []);
+      setNetworks(n || []);
     } catch {
-      // Keep demo data intact if live loading fails
+      setContainers([]);
+      setImages([]);
+      setVolumes([]);
+      setNetworks([]);
     }
     setLoading(false);
   }, []);
@@ -2373,12 +2356,17 @@ export default function DockerPage() {
       {/* ── Top Connection Banner ─────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${connected === true ? 'bg-success-500 animate-pulse' : isDemoMode ? 'bg-primary-500 animate-pulse' : 'bg-gray-400'}`} />
-          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${connected === true ? 'bg-success-500 animate-pulse' : 'bg-rose-500'}`} />
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             Docker Engine
-            {sysInfo && (
-              <span className="ml-2 text-xs font-mono text-success-500">
+            {connected === true && sysInfo && (
+              <span className="text-xs font-mono text-success-500">
                 v{sysInfo.ServerVersion} · {sysInfo.OperatingSystem} · {sysInfo.NCPU} CPU · {formatBytes(sysInfo.MemTotal)} RAM
+              </span>
+            )}
+            {connected === false && (
+              <span className="text-xs px-2 py-0.5 rounded bg-error-500/10 text-error-400 font-medium">
+                Offline
               </span>
             )}
           </span>
@@ -2387,12 +2375,10 @@ export default function DockerPage() {
               <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Connecting...
             </span>
           )}
-
-
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {(connected === true || isDemoMode) && (
+          {connected === true && (
             <>
               <button
                 onClick={() => setShowBuildModal(true)}
@@ -2431,7 +2417,7 @@ export default function DockerPage() {
               </button>
             </>
           )}
-          {(connected === true || isDemoMode) && tab === 'images' && (
+          {connected === true && tab === 'images' && (
             <button
               onClick={() => setShowPullModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium transition-colors"
@@ -2450,44 +2436,66 @@ export default function DockerPage() {
         </div>
       </div>
 
+      {/* ── Offline Banner ────────────────────────────────────────────────── */}
+      {connected === false && (
+        <div className="flex items-center justify-between p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-400">
+          <div className="flex items-center gap-3">
+            <WifiOff className="w-5 h-5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold">Docker Daemon Not Connected</p>
+              <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-0.5">
+                {connectError || 'Docker TCP endpoint (localhost:2375) unreachable.'} Ensure Docker Desktop or dockerd is running with TCP API enabled on port 2375.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={connect}
+            disabled={connecting}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 dark:text-amber-300 text-xs font-semibold transition-colors flex-shrink-0"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${connecting ? 'animate-spin' : ''}`} />
+            Retry Connection
+          </button>
+        </div>
+      )}
 
       {/* ── Stat Cards ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           label="Running Containers"
-          value={connected || isDemoMode ? runningCount : '—'}
+          value={connected ? runningCount : 0}
           icon={<Activity className="w-5 h-5" />}
           color="bg-success-500/10 text-success-500"
-          sub={sysInfo ? `${sysInfo.ContainersPaused} paused · ${sysInfo.ContainersStopped} stopped` : undefined}
+          sub={connected && sysInfo ? `${sysInfo.ContainersPaused} paused · ${sysInfo.ContainersStopped} stopped` : undefined}
         />
         <StatCard
           label="Total Containers"
-          value={connected || isDemoMode ? containers.length : '—'}
+          value={connected ? containers.length : 0}
           icon={<Box className="w-5 h-5" />}
           color="bg-primary-500/10 text-primary-500"
         />
         <StatCard
           label="Docker Images"
-          value={connected || isDemoMode ? images.length : '—'}
+          value={connected ? images.length : 0}
           icon={<Layers className="w-5 h-5" />}
           color="bg-accent-500/10 text-accent-500"
           sub={
-            images.length
+            connected && images.length
               ? `${formatBytes(images.reduce((s, i) => s + (i.Size || 0), 0))} total`
               : undefined
           }
         />
         <StatCard
           label="Volumes"
-          value={connected || isDemoMode ? volumes.length : '—'}
+          value={connected ? volumes.length : 0}
           icon={<HardDrive className="w-5 h-5" />}
           color="bg-warning-500/10 text-warning-500"
-          sub={networks.length ? `${networks.length} networks` : undefined}
+          sub={connected && networks.length ? `${networks.length} networks` : undefined}
         />
       </div>
 
       {/* ── Disk Usage Breakdown ─────────────────────────────────────────── */}
-      <DiskUsageCard connected={connected === true} isDemoMode={isDemoMode} />
+      <DiskUsageCard connected={connected === true} />
 
       {/* ── Tab Navigation ────────────────────────────────────────────────── */}
       <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800 overflow-x-auto pb-0">
@@ -2503,7 +2511,7 @@ export default function DockerPage() {
           >
             {t.icon}
             {t.label}
-            {(connected || isDemoMode) && (
+            {connected && (
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                 tab === t.id ? 'bg-primary-500/10 text-primary-500' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
               }`}>
@@ -2548,7 +2556,7 @@ export default function DockerPage() {
                 <option value="exited">Exited</option>
                 <option value="paused">Paused</option>
               </select>
-              {(connected === true || isDemoMode) && (
+              {connected === true && (
                 <button
                   onClick={() => {
                     setCreateModalInitialImage('');
@@ -2566,7 +2574,9 @@ export default function DockerPage() {
           {loading ? (
             <div className="py-16 text-center text-gray-400 animate-pulse text-sm">Loading containers...</div>
           ) : filteredContainers.length === 0 ? (
-            <div className="py-16 text-center text-gray-400 text-sm">No containers found.</div>
+            <div className="py-16 text-center text-gray-400 text-sm">
+              {connected ? 'No containers found.' : 'Docker Engine is offline. Connect Docker daemon to view containers.'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -2743,7 +2753,9 @@ export default function DockerPage() {
           {loading ? (
             <div className="py-16 text-center text-gray-400 animate-pulse text-sm">Loading images...</div>
           ) : images.length === 0 ? (
-            <div className="py-16 text-center text-gray-400 text-sm">No images found.</div>
+            <div className="py-16 text-center text-gray-400 text-sm">
+              {connected ? 'No images found.' : 'Docker Engine is offline. Connect Docker daemon to view images.'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -2787,7 +2799,7 @@ export default function DockerPage() {
                             >
                               <Tag className="w-3.5 h-3.5" />
                             </button>
-                            {(connected === true || isDemoMode) && (
+                            {connected === true && (
                               <>
                                 <button
                                   onClick={() => setPushTarget(tagPart === 'latest' || tagPart === repo ? tag : repo + ':' + tagPart)}
@@ -2849,7 +2861,7 @@ export default function DockerPage() {
                 <p className="text-xs text-gray-400">{volumes.length} volumes mounted</p>
               </div>
             </div>
-            {(connected === true || isDemoMode) && (
+            {connected === true && (
               <button
                 onClick={() => setShowCreateVolumeModal(true)}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-all"
@@ -2859,7 +2871,9 @@ export default function DockerPage() {
             )}
           </div>
           {volumes.length === 0 ? (
-            <div className="py-16 text-center text-gray-400 text-sm">No volumes found.</div>
+            <div className="py-16 text-center text-gray-400 text-sm">
+              {connected ? 'No volumes found.' : 'Docker Engine is offline. Connect Docker daemon to view volumes.'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -2921,7 +2935,7 @@ export default function DockerPage() {
                 <p className="text-xs text-gray-400">{networks.length} networks configured</p>
               </div>
             </div>
-            {(connected === true || isDemoMode) && (
+            {connected === true && (
               <button
                 onClick={() => setShowCreateNetworkModal(true)}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-all"
@@ -2931,7 +2945,9 @@ export default function DockerPage() {
             )}
           </div>
           {networks.length === 0 ? (
-            <div className="py-16 text-center text-gray-400 text-sm">No networks found.</div>
+            <div className="py-16 text-center text-gray-400 text-sm">
+              {connected ? 'No networks found.' : 'Docker Engine is offline. Connect Docker daemon to view networks.'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
