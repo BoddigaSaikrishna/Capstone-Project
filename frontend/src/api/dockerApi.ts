@@ -76,22 +76,36 @@ const DOCKER_BASE = '/docker-proxy';
 // ─── Connection Test ──────────────────────────────────────────────────────────
 
 export async function testDockerConnection(): Promise<DockerSystemInfo> {
-  const res = await fetch(`${DOCKER_BASE}/info`);
-  if (!res.ok) {
-    if (res.status === 0 || res.status === 500 || res.status === 502 || res.status === 503 || res.type === 'opaque') {
+  try {
+    const res = await fetch(`${DOCKER_BASE}/info`);
+    if (!res.ok) {
       throw new Error('Docker Engine TCP API (localhost:2375) is unreachable.');
     }
-    throw new Error(`Docker API error: ${res.status} ${res.statusText}`);
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('Docker Engine TCP API (localhost:2375) is unreachable.');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err?.message?.includes('JSON') || err?.message?.includes('token') || err?.name === 'SyntaxError') {
+      throw new Error('Docker Engine TCP API (localhost:2375) is unreachable.');
+    }
+    throw err;
   }
-  return res.json();
 }
 
 // ─── Containers ───────────────────────────────────────────────────────────────
 
 export async function fetchDockerContainers(): Promise<DockerContainer[]> {
-  const res = await fetch(`${DOCKER_BASE}/containers/json?all=true&size=true`);
-  if (!res.ok) throw new Error(`Failed to fetch containers: ${res.statusText}`);
-  return res.json();
+  try {
+    const res = await fetch(`${DOCKER_BASE}/containers/json?all=true&size=true`);
+    if (!res.ok) return [];
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function startContainer(id: string): Promise<void> {
@@ -241,9 +255,15 @@ export async function fetchContainerStats(id: string): Promise<DockerStats> {
 // ─── Images ───────────────────────────────────────────────────────────────────
 
 export async function fetchDockerImages(): Promise<DockerImage[]> {
-  const res = await fetch(`${DOCKER_BASE}/images/json?all=false`);
-  if (!res.ok) throw new Error(`Failed to fetch images: ${res.statusText}`);
-  return res.json();
+  try {
+    const res = await fetch(`${DOCKER_BASE}/images/json?all=false`);
+    if (!res.ok) return [];
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function removeImage(id: string, force = false): Promise<void> {
@@ -327,10 +347,16 @@ export async function execContainer(id: string, cmd: string[]): Promise<string> 
 // ─── Volumes ──────────────────────────────────────────────────────────────────
 
 export async function fetchDockerVolumes(): Promise<DockerVolume[]> {
-  const res = await fetch(`${DOCKER_BASE}/volumes`);
-  if (!res.ok) throw new Error(`Failed to fetch volumes: ${res.statusText}`);
-  const data = await res.json();
-  return data.Volumes ?? [];
+  try {
+    const res = await fetch(`${DOCKER_BASE}/volumes`);
+    if (!res.ok) return [];
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return [];
+    const data = await res.json();
+    return data.Volumes ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function createVolume(name: string, driver = 'local'): Promise<DockerVolume> {
@@ -353,9 +379,15 @@ export async function removeVolume(name: string, force = false): Promise<void> {
 // ─── Networks ─────────────────────────────────────────────────────────────────
 
 export async function fetchDockerNetworks(): Promise<DockerNetwork[]> {
-  const res = await fetch(`${DOCKER_BASE}/networks`);
-  if (!res.ok) throw new Error(`Failed to fetch networks: ${res.statusText}`);
-  return res.json();
+  try {
+    const res = await fetch(`${DOCKER_BASE}/networks`);
+    if (!res.ok) return [];
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function createNetwork(name: string, driver = 'bridge'): Promise<{ Id: string }> {

@@ -2175,7 +2175,11 @@ export default function DockerPage() {
       await loadAll();
     } catch (e: any) {
       setConnected(false);
-      setConnectError(e.message || 'Docker TCP endpoint (localhost:2375) unreachable');
+      const rawMsg = e?.message || '';
+      const cleanError = (rawMsg.includes('JSON') || rawMsg.includes('<!doctype') || rawMsg.includes('token') || rawMsg.includes('SyntaxError'))
+        ? 'Docker TCP endpoint (localhost:2375) is unreachable.'
+        : rawMsg || 'Docker TCP endpoint (localhost:2375) is unreachable.';
+      setConnectError(cleanError);
       setIsDemoMode(false);
       setSysInfo(null);
       setContainers([]);
@@ -2444,7 +2448,7 @@ export default function DockerPage() {
             <div>
               <p className="text-xs font-semibold">Docker Daemon Not Connected</p>
               <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-0.5">
-                {connectError || 'Docker TCP endpoint (localhost:2375) unreachable.'} Ensure Docker Desktop or dockerd is running with TCP API enabled on port 2375.
+                {connectError ? `${connectError} ` : ''}Ensure Docker Desktop or dockerd is running with TCP API enabled on port 2375.
               </p>
             </div>
           </div>
