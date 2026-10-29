@@ -1,0 +1,22 @@
+inbound:
+  - expressions:
+      - "req.method == 'OPTIONS'"
+    actions:
+      - type: "custom-response"
+        config:
+          status_code: 200
+          headers:
+            access-control-allow-origin: "*"
+            access-control-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+            access-control-allow-headers: "*"
+
+outbound:
+  - expressions:
+      - "true"
+    actions:
+      - type: "add-headers"
+        config:
+          headers:
+            access-control-allow-origin: "*"
+            access-control-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+            access-control-allow-headers: "*"
