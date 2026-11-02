@@ -1,4 +1,4 @@
-inbound:
+on_http_request:
   - expressions:
       - "req.method == 'OPTIONS'"
     actions:
@@ -8,15 +8,16 @@ inbound:
           headers:
             access-control-allow-origin: "*"
             access-control-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
-            access-control-allow-headers: "*"
+            access-control-allow-headers: "Authorization, Content-Type, Accept, ngrok-skip-browser-warning"
+            access-control-max-age: "86400"
 
-outbound:
+on_http_response:
   - expressions:
-      - "true"
+      - "req.method != 'OPTIONS'"
     actions:
       - type: "add-headers"
         config:
           headers:
             access-control-allow-origin: "*"
             access-control-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
-            access-control-allow-headers: "*"
+            access-control-allow-headers: "Authorization, Content-Type, Accept, ngrok-skip-browser-warning"

@@ -1,7 +1,12 @@
 @echo off
 title Jenkins Permanent Tunnel (ngrok)
 cd /d "%~dp0"
-echo Starting permanent HTTPS tunnel for Jenkins with CORS policy...
-echo Domain: https://purplish-exhaust-passable.ngrok-free.dev
-ngrok http 8080 --url https://purplish-exhaust-passable.ngrok-free.dev --traffic-policy-file traffic-policy.yml
+echo ====================================================
+echo  Jenkins Permanent ngrok Tunnel Manager
+echo ====================================================
+node ensure-tunnel.cjs
+echo.
+echo Tunnel Domain: https://purplish-exhaust-passable.ngrok-free.dev
+echo Local Target:  http://localhost:8080
+echo.
 pause
