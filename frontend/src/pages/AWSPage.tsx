@@ -1217,11 +1217,11 @@ export default function AWSPage() {
                 <h2 className="text-xl font-bold tracking-tight text-white">AWS Cloud Infrastructure</h2>
                 <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-success-500/10 text-success-400 border border-success-500/20 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-success-400 animate-pulse" />
-                  Connected · IAM: MLOps-Admin
+                  Active · IAM: MLOps-Admin
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1 font-mono">
-                Account: 123456789012 · Production MLOps VPC (vpc-0a1b2c3d) · Region: us-east-1
+                MLOps Cloud Infrastructure · Region: us-east-1 (N. Virginia)
               </p>
             </div>
           </div>
