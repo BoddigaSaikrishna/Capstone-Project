@@ -415,9 +415,11 @@ function ModelMetricsModal({
 function DeployModelModal({
   app,
   onClose,
+  onDeployed,
 }: {
   app: MLApplication;
   onClose: () => void;
+  onDeployed?: () => void;
 }) {
   const [strategy, setStrategy] = useState('canary');
   const [traffic, setTraffic] = useState('10');
@@ -429,6 +431,7 @@ function DeployModelModal({
     await new Promise((r) => setTimeout(r, 700));
     setDeploying(false);
     setDeployed(true);
+    onDeployed?.();
   };
 
   return createPortal(
@@ -546,7 +549,7 @@ function Rocket(props: any) {
 // ─── Main MLApplicationsPage Component ────────────────────────────────────────
 
 export default function MLApplicationsPage() {
-  const { apps, loading, error, addApp, deleteApp } = useMLApplications();
+  const { apps, loading, error, addApp, deleteApp, updateApp } = useMLApplications();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -892,6 +895,12 @@ export default function MLApplicationsPage() {
         <DeployModelModal
           app={deployApp}
           onClose={() => setDeployApp(null)}
+          onDeployed={() => {
+            updateApp(deployApp.id, {
+              status: 'running',
+              lastTrained: new Date().toISOString(),
+            });
+          }}
         />
       )}
 

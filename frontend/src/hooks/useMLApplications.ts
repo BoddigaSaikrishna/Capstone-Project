@@ -49,8 +49,27 @@ function toDB(app: Omit<MLApplication, 'id' | 'createdAt'>): Record<string, unkn
   };
 }
 
+function loadLocalApps(): MLApplication[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('mldevops_ml_applications');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalApps(apps: MLApplication[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('mldevops_ml_applications', JSON.stringify(apps));
+  } catch {
+    // ignore
+  }
+}
+
 export function useMLApplications() {
-  const [apps, setApps] = useState<MLApplication[]>([]);
+  const [apps, setApps] = useState<MLApplication[]>(() => loadLocalApps());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,12 +77,12 @@ export function useMLApplications() {
     setLoading(true);
     try {
       if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder.supabase.co') {
-        setApps([]);
+        setApps(loadLocalApps());
         return;
       }
 
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Supabase network timeout')), 3000)
+        setTimeout(() => reject(new Error('Supabase network timeout')), 2500)
       );
 
       const fetchPromise = supabase
@@ -73,14 +92,16 @@ export function useMLApplications() {
 
       const { data, error } = (await Promise.race([fetchPromise, timeoutPromise])) as any;
 
-      if (error || !data) {
-        setApps([]);
+      if (error || !data || data.length === 0) {
+        setApps(loadLocalApps());
         return;
       }
 
-      setApps(data.map(fromDB));
+      const parsed = data.map(fromDB);
+      setApps(parsed);
+      saveLocalApps(parsed);
     } catch {
-      setApps([]);
+      setApps(loadLocalApps());
     } finally {
       setLoading(false);
     }
@@ -98,7 +119,11 @@ export function useMLApplications() {
           id: `ml_${Date.now()}`,
           createdAt: new Date().toISOString(),
         };
-        setApps((prev) => [newApp, ...prev]);
+        setApps((prev) => {
+          const updated = [newApp, ...prev];
+          saveLocalApps(updated);
+          return updated;
+        });
         return newApp;
       }
       const { data, error } = await supabase
@@ -113,11 +138,19 @@ export function useMLApplications() {
           id: `ml_${Date.now()}`,
           createdAt: new Date().toISOString(),
         };
-        setApps((prev) => [newApp, ...prev]);
+        setApps((prev) => {
+          const updated = [newApp, ...prev];
+          saveLocalApps(updated);
+          return updated;
+        });
         return newApp;
       }
       const newApp = fromDB(data as DBMLApp);
-      setApps((prev) => [newApp, ...prev]);
+      setApps((prev) => {
+        const updated = [newApp, ...prev];
+        saveLocalApps(updated);
+        return updated;
+      });
       return newApp;
     } catch {
       const newApp: MLApplication = {
@@ -125,7 +158,11 @@ export function useMLApplications() {
         id: `ml_${Date.now()}`,
         createdAt: new Date().toISOString(),
       };
-      setApps((prev) => [newApp, ...prev]);
+      setApps((prev) => {
+        const updated = [newApp, ...prev];
+        saveLocalApps(updated);
+        return updated;
+      });
       return newApp;
     }
   }, []);
@@ -138,9 +175,21 @@ export function useMLApplications() {
     } catch {
       // ignore
     }
-    setApps((prev) => prev.filter((a) => a.id !== id));
+    setApps((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      saveLocalApps(updated);
+      return updated;
+    });
     return true;
   }, []);
 
-  return { apps, loading, error, addApp, deleteApp, refetch: fetchApps };
+  const updateApp = useCallback((id: string, updates: Partial<MLApplication>) => {
+    setApps((prev) => {
+      const updated = prev.map((a) => (a.id === id ? { ...a, ...updates } : a));
+      saveLocalApps(updated);
+      return updated;
+    });
+  }, []);
+
+  return { apps, loading, error, addApp, deleteApp, updateApp, refetch: fetchApps };
 }
