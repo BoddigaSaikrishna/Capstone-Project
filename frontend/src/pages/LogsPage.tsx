@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Card, { CardHeader } from '@/components/ui/Card';
-import { logEntries as initialLogEntries } from '@/api/mockData';
 import type { LogSource, LogEntry } from '@/types';
 import { formatTime } from '@/utils/format';
 import {
@@ -46,89 +45,18 @@ const levelConfig: Record<string, { text: string; bg: string; border: string }> 
 
 type FilterType = 'all' | LogSource;
 
-// Realistic stream log generator pool
-const simulatedStreamPool: Omit<LogEntry, 'id' | 'timestamp'>[] = [
-  {
-    source: 'ml-inference',
-    level: 'INFO',
-    service: 'fraud-model-worker-0',
-    message: 'Batch prediction executed: 128 vectors evaluated in 14.1ms (99.8% confidence)',
-  },
-  {
-    source: 'application',
-    level: 'INFO',
-    service: 'api-gateway',
-    message: 'POST /v2/predict 200 OK - client: 192.168.1.104 - 16.2ms',
-  },
-  {
-    source: 'aws',
-    level: 'INFO',
-    service: 'cloudwatch-agent',
-    message: 'Telemetry flush: GPU utilization 42%, VRAM used 3.8GB/24GB on i-0a81b2c3d4e5f6071',
-  },
-  {
-    source: 'docker',
-    level: 'INFO',
-    service: 'containerd',
-    message: 'Health probe /healthz returned healthy (container: fraud-api-worker-2)',
-  },
-  {
-    source: 'ml-inference',
-    level: 'DEBUG',
-    service: 'torch-onnx-runtime',
-    message: 'CUDA kernel execution pipeline synced. TensorRT FP16 quantization active',
-  },
-  {
-    source: 'application',
-    level: 'WARN',
-    service: 'rate-limiter',
-    message: 'Client tier approaching 80% quota threshold (req/s: 820 / 1000 max)',
-  },
-  {
-    source: 'jenkins',
-    level: 'INFO',
-    service: 'jenkins-runner',
-    message: 'Triggering background sanity check on model registry checksum hashes',
-  },
-  {
-    source: 'ml-inference',
-    level: 'ERROR',
-    service: 'drift-detector',
-    message: 'Anomaly detected: unexpected schema field "user_loyalty_score" missing in payload',
-  },
-];
-
 export default function LogsPage() {
-  const [logs, setLogs] = useState<LogEntry[]>(initialLogEntries);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isStreaming, setIsStreaming] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [streamSpeed, setStreamSpeed] = useState<number>(3000); // ms per tick
   const [autoScroll, setAutoScroll] = useState(true);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const logContainerRef = useRef<HTMLDivElement>(null);
-
-  // ── Auto-Streaming Simulator ───────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!isStreaming) return;
-
-    const timer = setInterval(() => {
-      const template = simulatedStreamPool[Math.floor(Math.random() * simulatedStreamPool.length)];
-      const newEntry: LogEntry = {
-        id: `stream-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        timestamp: new Date().toISOString(),
-        ...template,
-      };
-
-      setLogs((prev) => [...prev.slice(-300), newEntry]); // Keep last 300 logs in memory
-    }, streamSpeed);
-
-    return () => clearInterval(timer);
-  }, [isStreaming, streamSpeed]);
 
   // ── Auto-scroll Effect ─────────────────────────────────────────────────────
 

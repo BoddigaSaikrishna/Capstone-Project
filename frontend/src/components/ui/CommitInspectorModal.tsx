@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { GitCommit, X, Copy, Check, ShieldCheck, FileCode, CheckCircle2, User } from 'lucide-react';
+import { GitCommit, X, Copy, Check, ShieldCheck, CheckCircle2, User, ExternalLink } from 'lucide-react';
 
 export interface CommitDetail {
   sha: string;
@@ -113,36 +113,17 @@ export default function CommitInspectorModal({
             </div>
           </div>
 
-          {/* Changed Files Mock Summary */}
-          <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-            <div className="flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              <span>Changed Files (3)</span>
-              <span className="text-[11px] text-success-500 font-mono">+48 -12</span>
-            </div>
-
-            <div className="space-y-1.5 text-xs font-mono">
-              <div className="p-2 rounded bg-gray-50 dark:bg-gray-800/40 flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-gray-300">
-                  <FileCode className="w-3.5 h-3.5 text-primary-400" />
-                  src/models/bert_classifier.py
-                </span>
-                <span className="text-[11px] text-success-500">+32 -4</span>
-              </div>
-              <div className="p-2 rounded bg-gray-50 dark:bg-gray-800/40 flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-gray-300">
-                  <FileCode className="w-3.5 h-3.5 text-accent-400" />
-                  Dockerfile
-                </span>
-                <span className="text-[11px] text-success-500">+10 -2</span>
-              </div>
-              <div className="p-2 rounded bg-gray-50 dark:bg-gray-800/40 flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-gray-300">
-                  <FileCode className="w-3.5 h-3.5 text-warning-500" />
-                  pipeline-config.yaml
-                </span>
-                <span className="text-[11px] text-success-500">+6 -6</span>
-              </div>
-            </div>
+          {/* GitHub Commit Link */}
+          <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+            <a
+              href={`https://github.com/${repoName}/commit/${commit.sha}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800/80 hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-semibold text-gray-800 dark:text-gray-200 transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-primary-400" />
+              <span>View Full Commit Diff & Files on GitHub</span>
+            </a>
           </div>
 
         </div>

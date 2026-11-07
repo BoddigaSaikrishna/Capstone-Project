@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const EXPECTED_DOMAIN = 'purplish-exhaust-passable.ngrok-free.dev';
-const TRAFFIC_POLICY_FILE = path.join(__dirname, 'traffic-policy.yml');
+const WATCHDOG_FILE = path.join(__dirname, 'tunnel-watchdog.cjs');
 
 function checkLocalNgrokApi() {
   return new Promise((resolve) => {
@@ -35,39 +35,34 @@ async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function launchWatchdog() {
+  try {
+    const child = spawn(
+      'node',
+      [WATCHDOG_FILE],
+      {
+        cwd: __dirname,
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      }
+    );
+    child.unref();
+  } catch (err) {
+    console.warn('[Tunnel] Could not launch watchdog:', err.message);
+  }
+}
+
 async function main() {
   const isAlreadyRunning = await checkLocalNgrokApi();
   if (isAlreadyRunning) {
-    console.log(`[Tunnel] \x1b[32m✔ ngrok Jenkins tunnel is already active\x1b[0m (https://${EXPECTED_DOMAIN})`);
+    console.log(`[Tunnel] \x1b[32m✔ ngrok Jenkins tunnel is active\x1b[0m (https://${EXPECTED_DOMAIN})`);
+    launchWatchdog();
     process.exit(0);
   }
 
-  console.log(`[Tunnel] ngrok tunnel not detected. Launching in background...`);
-
-  if (!fs.existsSync(TRAFFIC_POLICY_FILE)) {
-    console.warn(`[Tunnel] Warning: traffic policy file not found at ${TRAFFIC_POLICY_FILE}`);
-  }
-
-  const child = spawn(
-    'ngrok',
-    [
-      'http',
-      '8080',
-      '--url',
-      `https://${EXPECTED_DOMAIN}`,
-      '--traffic-policy-file',
-      TRAFFIC_POLICY_FILE,
-    ],
-    {
-      cwd: __dirname,
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-      shell: true,
-    }
-  );
-
-  child.unref();
+  console.log(`[Tunnel] ngrok tunnel not detected. Launching continuous Watchdog...`);
+  launchWatchdog();
 
   // Poll for up to 8 seconds to confirm tunnel is ready
   for (let i = 0; i < 16; i++) {
@@ -79,12 +74,11 @@ async function main() {
     }
   }
 
-  console.log(`[Tunnel] \x1b[33mTunnel process launched in background (awaiting public registration)\x1b[0m`);
+  console.log(`[Tunnel] \x1b[33mWatchdog launched in background (awaiting public registration)\x1b[0m`);
   process.exit(0);
 }
 
 main().catch((err) => {
   console.error('[Tunnel] Error verifying ngrok tunnel:', err);
-  process.exit(0); // Continue dev process even on error
+  process.exit(0);
 });
-

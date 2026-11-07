@@ -8,9 +8,18 @@ export interface RealGitHubRepo {
   html_url: string;
   description: string | null;
   stargazers_count: number;
+  forks_count?: number;
+  open_issues_count?: number;
   language: string | null;
   default_branch: string;
   updated_at: string;
+  created_at?: string;
+  pushed_at?: string;
+  owner?: {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+  };
 }
 
 export interface GitHubUser {

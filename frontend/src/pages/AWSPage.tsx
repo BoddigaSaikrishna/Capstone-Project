@@ -123,164 +123,12 @@ export interface CloudWatchAlarm {
   period: string;
 }
 
-// ─── Initial Production Mock Fleet ───────────────────────────────────────────
+// ─── Initial Production Fleet (Zero Dummy Data) ───────────────────────────────
 
-const INITIAL_EC2_INSTANCES: AWSEC2Instance[] = [
-  {
-    id: 'ec2-1',
-    instanceId: 'i-0f92b7c4d183a001',
-    name: 'ml-inference-fraud-api',
-    type: 'g4dn.xlarge',
-    state: 'running',
-    publicIP: '54.210.175.126',
-    privateIP: '172.31.18.42',
-    region: 'us-east-1a',
-    appUrl: 'http://54.210.175.126:8000/docs',
-    ami: 'ami-0c7217cdde317cfec (Deep Learning OSS AMI PyTorch 2.2)',
-    securityGroup: 'sg-mlops-inference-prod',
-    vpcId: 'vpc-0a1b2c3d4e5f',
-    uptime: '14 days 6 hours',
-    isGpu: true,
-  },
-  {
-    id: 'ec2-2',
-    instanceId: 'i-0a8163f92b51c002',
-    name: 'fullstack-demo-app-prod',
-    type: 't3.medium',
-    state: 'running',
-    publicIP: '54.210.175.126',
-    privateIP: '172.31.24.19',
-    region: 'us-east-1b',
-    appUrl: 'http://54.210.175.126:3000/health',
-    ami: 'ami-053b0d53c279acc90 (Ubuntu 22.04 LTS)',
-    securityGroup: 'sg-fullstack-web-prod',
-    vpcId: 'vpc-0a1b2c3d4e5f',
-    uptime: '14 days 6 hours',
-  },
-  {
-    id: 'ec2-3',
-    instanceId: 'i-0d4812e9b014a003',
-    name: 'mldevops-control-center',
-    type: 't3.small',
-    state: 'running',
-    publicIP: '54.210.175.126',
-    privateIP: '172.31.40.88',
-    region: 'us-east-1a',
-    appUrl: 'http://54.210.175.126:5173',
-    ami: 'ami-053b0d53c279acc90 (Ubuntu 22.04 LTS)',
-    securityGroup: 'sg-dashboard-ingress',
-    vpcId: 'vpc-0a1b2c3d4e5f',
-    uptime: '14 days 6 hours',
-  },
-  {
-    id: 'ec2-4',
-    instanceId: 'i-0e9921c3b772a004',
-    name: 'postgres-redis-database-node',
-    type: 'r6i.large',
-    state: 'running',
-    publicIP: '54.210.89.17',
-    privateIP: '172.31.40.89',
-    region: 'us-east-1b',
-    appUrl: '—',
-    ami: 'ami-053b0d53c279acc90 (Ubuntu 22.04 LTS)',
-    securityGroup: 'sg-database-cluster',
-    vpcId: 'vpc-0a1b2c3d4e5f',
-    uptime: '28 days 12 hours',
-  },
-];
-
-const INITIAL_S3_BUCKETS: S3Bucket[] = [
-  {
-    name: 'ml-model-artifacts-prod',
-    region: 'us-east-1',
-    creationDate: '2026-08-10',
-    versioning: true,
-    encryption: 'AWS-KMS (aws/s3)',
-    objects: [
-      { key: 'fraud-detection/v2.4/model.py', size: 4591, lastModified: '2026-09-30 22:00', storageClass: 'Standard' },
-      { key: 'fraud-detection/v2.4/train.py', size: 4913, lastModified: '2026-09-30 22:00', storageClass: 'Standard' },
-      { key: 'fraud-detection/v2.4/model_metrics.json', size: 234, lastModified: '2026-09-30 22:05', storageClass: 'Standard' },
-      { key: 'fullstack-app/v1.0/server.js', size: 5200, lastModified: '2026-09-30 23:40', storageClass: 'Standard' },
-    ],
-  },
-  {
-    name: 'devops-pipeline-audit-logs',
-    region: 'us-east-1',
-    creationDate: '2026-08-15',
-    versioning: false,
-    encryption: 'AES-256',
-    objects: [
-      { key: 'ci-runs/build-154-junit.xml', size: 14200, lastModified: '2026-09-30 22:15', storageClass: 'Standard' },
-      { key: 'ci-runs/build-42-test.xml', size: 8500, lastModified: '2026-09-30 23:45', storageClass: 'Standard' },
-    ],
-  },
-  {
-    name: 'pipeline-artifacts-archive',
-    region: 'us-east-1',
-    creationDate: '2026-08-20',
-    versioning: true,
-    encryption: 'AES-256',
-    objects: [
-      { key: 'builds/jenkins-build-149-artifacts.tar.gz', size: 54200000, lastModified: '2026-09-21 08:30', storageClass: 'Standard' },
-      { key: 'builds/docker-image-export-v2.4.tar', size: 412000000, lastModified: '2026-09-21 08:34', storageClass: 'Standard' },
-      { key: 'test_coverage_report_html.zip', size: 12400000, lastModified: '2026-09-21 08:35', storageClass: 'Standard' },
-    ],
-  },
-  {
-    name: 'cloudwatch-inference-logs-export',
-    region: 'us-west-2',
-    creationDate: '2026-08-01',
-    versioning: false,
-    encryption: 'AES-256',
-    objects: [
-      { key: '2026-09-20-inference-access.log.gz', size: 14200000, lastModified: '2026-09-21 00:05', storageClass: 'Glacier Instant Retrieval' },
-      { key: '2026-09-19-inference-access.log.gz', size: 13800000, lastModified: '2026-09-20 00:05', storageClass: 'Glacier Instant Retrieval' },
-    ],
-  },
-];
-
-const INITIAL_SECURITY_GROUPS: SecurityGroup[] = [
-  {
-    id: 'sg-mlops-inference-prod',
-    name: 'mlops-inference-prod-sg',
-    description: 'Security group for PyTorch / TorchServe model serving endpoints',
-    vpcId: 'vpc-0a1b2c3d4e5f',
-    rules: [
-      { id: 'r-1', type: 'Inbound', protocol: 'TCP', portRange: '8080', source: '0.0.0.0/0', description: 'TorchServe Prediction REST API' },
-      { id: 'r-2', type: 'Inbound', protocol: 'TCP', portRange: '443', source: '0.0.0.0/0', description: 'HTTPS Public Gateway' },
-      { id: 'r-3', type: 'Inbound', protocol: 'TCP', portRange: '22', source: '172.31.0.0/16', description: 'Internal Bastion SSH Access' },
-      { id: 'r-4', type: 'Outbound', protocol: 'All', portRange: 'All', source: '0.0.0.0/0', description: 'Allow all outbound traffic' },
-    ],
-  },
-  {
-    id: 'sg-redis-featurestore-cluster',
-    name: 'redis-featurestore-sg',
-    description: 'Private Redis in-memory cache for ultra-low latency feature retrieval',
-    vpcId: 'vpc-0a1b2c3d4e5f',
-    rules: [
-      { id: 'r-5', type: 'Inbound', protocol: 'TCP', portRange: '6379', source: 'sg-mlops-inference-prod', description: 'Redis access from inference fleet' },
-      { id: 'r-6', type: 'Outbound', protocol: 'All', portRange: 'All', source: '0.0.0.0/0', description: 'Allow all outbound traffic' },
-    ],
-  },
-  {
-    id: 'sg-ml-training-gpu-node',
-    name: 'gpu-training-cluster-sg',
-    description: 'High performance NVIDIA GPU distributed training cluster',
-    vpcId: 'vpc-0a1b2c3d4e5f',
-    rules: [
-      { id: 'r-7', type: 'Inbound', protocol: 'TCP', portRange: '8888', source: '172.31.0.0/16', description: 'JupyterLab Server Internal' },
-      { id: 'r-8', type: 'Inbound', protocol: 'TCP', portRange: '29500-29510', source: '172.31.40.0/24', description: 'PyTorch Distributed DDP RPC' },
-      { id: 'r-9', type: 'Inbound', protocol: 'TCP', portRange: '22', source: '172.31.0.0/16', description: 'SSH Management' },
-    ],
-  },
-];
-
-const INITIAL_CLOUDWATCH_ALARMS: CloudWatchAlarm[] = [
-  { id: 'alm-1', name: 'EC2-Fleet-High-CPU-Warning', metric: 'CPUUtilization > 85%', threshold: '85% (5 min avg)', state: 'OK', period: '300s' },
-  { id: 'alm-2', name: 'ModelServing-Latency-SLA-Breach', metric: 'TargetResponseTime > 200ms', threshold: '200 ms', state: 'OK', period: '60s' },
-  { id: 'alm-3', name: 'GPU-Memory-Spike-Alert', metric: 'GPUUtilization > 92%', threshold: '92% (p3.2xlarge)', state: 'ALARM', period: '60s' },
-  { id: 'alm-4', name: 'S3-Bucket-Storage-Anomaly', metric: 'BucketSizeBytes > 50 GB', threshold: '50 GB', state: 'OK', period: '86400s' },
-];
+const INITIAL_EC2_INSTANCES: AWSEC2Instance[] = [];
+const INITIAL_S3_BUCKETS: S3Bucket[] = [];
+const INITIAL_SECURITY_GROUPS: SecurityGroup[] = [];
+const INITIAL_CLOUDWATCH_ALARMS: CloudWatchAlarm[] = [];
 
 function generateTelemetryData() {
   const points = [];
@@ -1261,7 +1109,7 @@ function UploadS3ObjectModal({
 export default function AWSPage() {
   const [instances, setInstances] = useState<AWSEC2Instance[]>(INITIAL_EC2_INSTANCES);
   const [buckets, setBuckets] = useState<S3Bucket[]>(INITIAL_S3_BUCKETS);
-  const [selectedBucketName, setSelectedBucketName] = useState<string>(INITIAL_S3_BUCKETS[0].name);
+  const [selectedBucketName, setSelectedBucketName] = useState<string>(INITIAL_S3_BUCKETS[0]?.name || '');
   const [securityGroups, setSecurityGroups] = useState<SecurityGroup[]>(INITIAL_SECURITY_GROUPS);
   const [alarms, setAlarms] = useState<CloudWatchAlarm[]>(INITIAL_CLOUDWATCH_ALARMS);
   const [telemetry] = useState(generateTelemetryData);
@@ -1542,7 +1390,14 @@ export default function AWSPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredInstances.map((inst) => {
+                {filteredInstances.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-16 text-center text-gray-400 text-sm">
+                      No EC2 instances running. Click "Launch Instance" to provision compute.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredInstances.map((inst) => {
                   const isLoading = actionLoading?.includes(inst.id);
                   return (
                     <tr
@@ -1683,7 +1538,7 @@ export default function AWSPage() {
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
@@ -1708,7 +1563,12 @@ export default function AWSPage() {
               </button>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800/60 max-h-[500px] overflow-y-auto">
-              {buckets.map((b) => {
+              {buckets.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 text-xs">
+                  No S3 buckets found. Click "New" to create one.
+                </div>
+              ) : (
+                buckets.map((b) => {
                 const isSelected = b.name === selectedBucketName;
                 const size = b.objects.reduce((s, o) => s + o.size, 0);
                 return (
@@ -1740,102 +1600,112 @@ export default function AWSPage() {
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </Card>
 
           {/* Bucket Objects Explorer */}
           <Card className="lg:col-span-2 border border-gray-200 dark:border-gray-800 p-0 overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Folder className="w-4 h-4 text-warning-400" />
-                  <span className="text-sm font-bold text-gray-900 dark:text-gray-100 font-mono">
-                    s3://{currentBucket.name}/
-                  </span>
+            {currentBucket ? (
+              <>
+                <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Folder className="w-4 h-4 text-warning-400" />
+                      <span className="text-sm font-bold text-gray-900 dark:text-gray-100 font-mono">
+                        s3://{currentBucket.name}/
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Region: {currentBucket.region} · Encryption: {currentBucket.encryption} · Versioning: {currentBucket.versioning ? 'Enabled' : 'Suspended'}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5" /> Upload Object
+                  </button>
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Region: {currentBucket.region} · Encryption: {currentBucket.encryption} · Versioning: {currentBucket.versioning ? 'Enabled' : 'Suspended'}
-                </p>
-              </div>
 
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-colors"
-              >
-                <Upload className="w-3.5 h-3.5" /> Upload Object
-              </button>
-            </div>
-
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/40">
-                    <th className="text-left px-5 py-3">Object Key Name</th>
-                    <th className="text-left px-5 py-3">Storage Class</th>
-                    <th className="text-left px-5 py-3">Size</th>
-                    <th className="text-left px-5 py-3">Last Modified</th>
-                    <th className="text-right px-5 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentBucket.objects.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-16 text-center text-gray-400 text-sm">
-                        No objects stored in this bucket.
-                      </td>
-                    </tr>
-                  ) : (
-                    currentBucket.objects.map((obj) => (
-                      <tr
-                        key={obj.key}
-                        className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 group"
-                      >
-                        <td className="px-5 py-3">
-                          <span className="flex items-center gap-2 font-mono text-xs text-gray-200">
-                            <File className="w-3.5 h-3.5 text-primary-400" />
-                            {obj.key}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3">
-                          <span className="px-2 py-0.5 rounded bg-gray-800 text-[10px] text-gray-300 font-mono">
-                            {obj.storageClass}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-xs text-gray-300 font-mono">{formatBytes(obj.size)}</td>
-                        <td className="px-5 py-3 text-xs text-gray-400">{obj.lastModified}</td>
-                        <td className="px-5 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => alert(`Simulated download starting for ${obj.key}`)}
-                              title="Download Object"
-                              className="p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setBuckets((prev) =>
-                                  prev.map((b) =>
-                                    b.name === currentBucket.name
-                                      ? { ...b, objects: b.objects.filter((o) => o.key !== obj.key) }
-                                      : b
-                                  )
-                                );
-                              }}
-                              title="Delete Object"
-                              className="p-1.5 rounded-md bg-error-500/10 hover:bg-error-500/20 text-error-400 transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
+                <div className="overflow-x-auto flex-1">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/40">
+                        <th className="text-left px-5 py-3">Object Key Name</th>
+                        <th className="text-left px-5 py-3">Storage Class</th>
+                        <th className="text-left px-5 py-3">Size</th>
+                        <th className="text-left px-5 py-3">Last Modified</th>
+                        <th className="text-right px-5 py-3">Actions</th>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {currentBucket.objects.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-16 text-center text-gray-400 text-sm">
+                            No objects stored in this bucket.
+                          </td>
+                        </tr>
+                      ) : (
+                        currentBucket.objects.map((obj) => (
+                          <tr
+                            key={obj.key}
+                            className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 group"
+                          >
+                            <td className="px-5 py-3">
+                              <span className="flex items-center gap-2 font-mono text-xs text-gray-200">
+                                <File className="w-3.5 h-3.5 text-primary-400" />
+                                {obj.key}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3">
+                              <span className="px-2 py-0.5 rounded bg-gray-800 text-[10px] text-gray-300 font-mono">
+                                {obj.storageClass}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-xs text-gray-300 font-mono">{formatBytes(obj.size)}</td>
+                            <td className="px-5 py-3 text-xs text-gray-400">{obj.lastModified}</td>
+                            <td className="px-5 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => alert(`Simulated download starting for ${obj.key}`)}
+                                  title="Download Object"
+                                  className="p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setBuckets((prev) =>
+                                      prev.map((b) =>
+                                        b.name === currentBucket.name
+                                          ? { ...b, objects: b.objects.filter((o) => o.key !== obj.key) }
+                                          : b
+                                      )
+                                    );
+                                  }}
+                                  title="Delete Object"
+                                  className="p-1.5 rounded-md bg-error-500/10 hover:bg-error-500/20 text-error-400 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div className="p-16 text-center text-gray-400 text-sm flex flex-col items-center justify-center">
+                <Database className="w-8 h-8 text-gray-500 mb-2 opacity-50" />
+                <p className="font-semibold text-gray-300">No Bucket Selected</p>
+                <p className="text-xs text-gray-500 mt-1">Create an S3 bucket to inspect and manage object storage.</p>
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -1963,7 +1833,14 @@ export default function AWSPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {alarms.map((alm) => (
+                  {alarms.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-gray-400 text-xs">
+                        No CloudWatch alarms configured. Click "Create Alarm" to add threshold triggers.
+                      </td>
+                    </tr>
+                  ) : (
+                    alarms.map((alm) => (
                     <tr key={alm.id} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30">
                       <td className="px-5 py-3 font-semibold text-xs text-gray-200">{alm.name}</td>
                       <td className="px-5 py-3 font-mono text-xs text-gray-400">{alm.metric}</td>
@@ -2002,7 +1879,7 @@ export default function AWSPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
@@ -2107,7 +1984,12 @@ export default function AWSPage() {
             </button>
           </div>
 
-          {securityGroups.map((sg) => (
+          {securityGroups.length === 0 ? (
+            <Card className="p-12 text-center text-gray-400 text-xs border border-gray-200 dark:border-gray-800">
+              No security groups configured. Click "Create Security Group" to add firewall rules.
+            </Card>
+          ) : (
+            securityGroups.map((sg) => (
             <Card key={sg.id} className="border border-gray-200 dark:border-gray-800 p-0 overflow-hidden">
               <div className="p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-900/60 flex items-center justify-between">
                 <div>
@@ -2174,7 +2056,7 @@ export default function AWSPage() {
                 </table>
               </div>
             </Card>
-          ))}
+          )))}
         </div>
       )}
 
@@ -2241,7 +2123,7 @@ export default function AWSPage() {
         />
       )}
 
-      {showUploadModal && (
+      {showUploadModal && currentBucket && (
         <UploadS3ObjectModal
           bucketName={currentBucket.name}
           onClose={() => setShowUploadModal(false)}

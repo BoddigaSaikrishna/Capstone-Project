@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   testDockerConnection,
+  getDockerBaseUrl,
+  setDockerBaseUrl,
   fetchDockerContainers,
   fetchDockerImages,
   fetchDockerVolumes,
@@ -2125,6 +2127,149 @@ function DiskUsageCard({ connected }: { connected: boolean }) {
   );
 }
 
+// ─── Docker Connection Modal ────────────────────────────────────────────────
+function DockerConnectModal({
+  isOpen,
+  onClose,
+  onConnected,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const [url, setUrl] = useState(() => getDockerBaseUrl());
+  const [testing, setTesting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleTest = async () => {
+    setTesting(true);
+    setError('');
+    setSuccess('');
+    try {
+      setDockerBaseUrl(url);
+      const info = await testDockerConnection();
+      setSuccess(`Connected successfully! Docker Engine ${info.ServerVersion || ''} (${info.OperatingSystem || 'Linux'})`);
+      setTimeout(() => {
+        onConnected();
+        onClose();
+      }, 800);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to connect to Docker Engine.');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleReset = () => {
+    setUrl('/docker-proxy');
+    setDockerBaseUrl('/docker-proxy');
+    setError('');
+    setSuccess('');
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary-500/10 text-primary-500">
+              <Server className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">Connect Docker Engine</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Configure your local or remote Docker daemon API</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+              Docker API Endpoint / Tunnel URL
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="/docker-proxy or https://your-docker-tunnel.ngrok-free.dev"
+                className="flex-1 px-3.5 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/40 font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleReset}
+                className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs text-gray-600 dark:text-gray-400 font-medium transition-colors"
+                title="Reset to local proxy default"
+              >
+                Reset
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5">
+              Default for local development is <code className="font-mono text-primary-500">/docker-proxy</code> (proxied to <code className="font-mono">http://localhost:2375</code>). For cloud deployments (Vercel), enter an HTTPS tunnel or remote Docker host.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-950/60 border border-gray-200 dark:border-gray-800 text-xs space-y-2">
+            <p className="font-semibold text-gray-900 dark:text-gray-200 flex items-center gap-1.5">
+              <Info className="w-4 h-4 text-primary-500" /> Docker Setup Instructions
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-gray-600 dark:text-gray-400 leading-relaxed text-[11px]">
+              <li>Open <strong>Docker Desktop</strong> on your machine.</li>
+              <li>Go to <strong>Settings &rarr; General</strong>.</li>
+              <li>Check <strong>"Expose daemon on tcp://localhost:2375 without TLS"</strong>.</li>
+              <li>Click <strong>Apply &amp; Restart</strong>.</li>
+              <li>For local web development, run <code className="font-mono bg-gray-200 dark:bg-gray-800 px-1 rounded">npm run dev</code> (Vite proxies requests automatically).</li>
+            </ol>
+          </div>
+
+          {error && (
+            <div className="p-3.5 rounded-xl bg-error-500/10 border border-error-500/20 text-error-500 dark:text-error-400 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">Connection Failed</p>
+                <p className="text-[11px] opacity-90">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {success && (
+            <div className="p-3.5 rounded-xl bg-success-500/10 border border-success-500/20 text-success-500 dark:text-success-400 text-xs flex items-center gap-2.5">
+              <Check className="w-4 h-4 shrink-0" />
+              <p className="font-semibold">{success}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/30 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs text-gray-700 dark:text-gray-300 font-medium transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleTest}
+            disabled={testing}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
+          >
+            {testing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
+            {testing ? 'Testing Connection...' : 'Test & Save Connection'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ─── Main DockerPage ──────────────────────────────────────────────────────────
 
 type TabId = 'containers' | 'images' | 'volumes' | 'networks';
@@ -2162,6 +2307,7 @@ export default function DockerPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [showBuildModal, setShowBuildModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
 
   // Connect & load data
   const connect = useCallback(async () => {
@@ -2430,6 +2576,12 @@ export default function DockerPage() {
             </button>
           )}
           <button
+            onClick={() => setShowConnectModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600/10 hover:bg-primary-600/20 text-primary-500 text-xs font-semibold border border-primary-500/20 transition-colors"
+          >
+            <Server className="w-3.5 h-3.5" /> Connect Engine
+          </button>
+          <button
             onClick={connect}
             disabled={connecting}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium transition-colors"
@@ -2448,18 +2600,27 @@ export default function DockerPage() {
             <div>
               <p className="text-xs font-semibold">Docker Daemon Not Connected</p>
               <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-0.5">
-                {connectError ? `${connectError} ` : ''}Ensure Docker Desktop or dockerd is running with TCP API enabled on port 2375.
+                {connectError ? `${connectError} ` : ''}Ensure Docker Desktop is running locally or configure an endpoint URL.
               </p>
             </div>
           </div>
-          <button
-            onClick={connect}
-            disabled={connecting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 dark:text-amber-300 text-xs font-semibold transition-colors flex-shrink-0"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${connecting ? 'animate-spin' : ''}`} />
-            Retry Connection
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowConnectModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 dark:text-amber-300 text-xs font-semibold transition-colors flex-shrink-0"
+            >
+              <Server className="w-3.5 h-3.5" />
+              Configure Endpoint
+            </button>
+            <button
+              onClick={connect}
+              disabled={connecting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-colors flex-shrink-0"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${connecting ? 'animate-spin' : ''}`} />
+              Retry Connection
+            </button>
+          </div>
         </div>
       )}
 
@@ -3133,6 +3294,13 @@ export default function DockerPage() {
           onClose={() => setShowBuildModal(false)}
           onBuilt={loadAll}
           onBuiltImage={(img) => setImages((p) => [img, ...p])}
+        />
+      )}
+      {showConnectModal && (
+        <DockerConnectModal
+          isOpen={showConnectModal}
+          onClose={() => setShowConnectModal(false)}
+          onConnected={connect}
         />
       )}
     </div>

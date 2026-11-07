@@ -38,25 +38,11 @@ const roleOptions: Role[] = [
 
 const initialUsers: ManagedUser[] = [
   {
-    id: '1',
-    identity: 'Sarah Chen',
-    role: 'Developer (Build & Deploy Access)',
+    id: 'user-admin',
+    identity: '2300039074cse3',
+    role: 'Admin (Full Platform Control)',
     status: 'Active',
     token: 'Valid',
-  },
-  {
-    id: '2',
-    identity: 'client@enterprise.com',
-    role: 'Stakeholder (Read-Only Metrics & Testing Access)',
-    status: 'Pending',
-    token: 'Expires in 24h',
-  },
-  {
-    id: '3',
-    identity: 'guest@external.com',
-    role: 'Stakeholder (Read-Only Metrics & Testing Access)',
-    status: 'Expired',
-    token: 'Invalid',
   },
 ];
 
@@ -151,6 +137,8 @@ export default function UserGovernancePage() {
   };
 
   const expiredCount = users.filter((u) => u.status === 'Expired').length;
+  const activeCount = users.filter((u) => u.status === 'Active').length;
+  const pendingCount = users.filter((u) => u.status === 'Pending').length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -258,11 +246,11 @@ export default function UserGovernancePage() {
           </div>
           <div className="flex items-end justify-between">
             <p className="text-3xl font-bold text-gray-100 tracking-tight">
-              12&nbsp;<span className="text-base font-normal text-gray-500">Users</span>
+              {activeCount}&nbsp;<span className="text-base font-normal text-gray-500">Users</span>
             </p>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-success-500/10 text-success-500">
               <TrendingUp className="w-3 h-3" />
-              +5% this week
+              Active
             </span>
           </div>
         </div>
@@ -278,12 +266,14 @@ export default function UserGovernancePage() {
           </div>
           <div className="flex items-end justify-between">
             <p className="text-3xl font-bold text-gray-100 tracking-tight">
-              3&nbsp;<span className="text-base font-normal text-gray-500">Links</span>
+              {pendingCount}&nbsp;<span className="text-base font-normal text-gray-500">Links</span>
             </p>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-warning-500/10 text-warning-500 animate-pulse-slow">
-              <AlertCircle className="w-3 h-3" />
-              Expiring Soon
-            </span>
+            {pendingCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-warning-500/10 text-warning-500 animate-pulse-slow">
+                <AlertCircle className="w-3 h-3" />
+                Expiring Soon
+              </span>
+            )}
           </div>
         </div>
 

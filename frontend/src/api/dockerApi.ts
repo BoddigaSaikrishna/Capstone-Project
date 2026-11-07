@@ -71,24 +71,55 @@ export interface DockerStats {
 
 // ─── Base URL ─────────────────────────────────────────────────────────────────
 
-const DOCKER_BASE = '/docker-proxy';
+export function getDockerBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('mldevops_docker_url');
+    if (custom) return custom.replace(/\/$/, '');
+  }
+  const envUrl = (import.meta.env.VITE_DOCKER_HOST || '').replace(/\/$/, '');
+  if (envUrl) return envUrl;
+  return '/docker-proxy';
+}
+
+export function setDockerBaseUrl(url: string): void {
+  if (typeof window !== 'undefined') {
+    if (!url || url.trim() === '' || url === '/docker-proxy') {
+      localStorage.removeItem('mldevops_docker_url');
+    } else {
+      localStorage.setItem('mldevops_docker_url', url.trim().replace(/\/$/, ''));
+    }
+  }
+}
 
 // ─── Connection Test ──────────────────────────────────────────────────────────
 
 export async function testDockerConnection(): Promise<DockerSystemInfo> {
+  const base = getDockerBaseUrl();
   try {
-    const res = await fetch(`${DOCKER_BASE}/info`);
+    const res = await fetch(`${base}/info`);
     if (!res.ok) {
-      throw new Error('Docker Engine TCP API (localhost:2375) is unreachable.');
+      throw new Error(`Docker Engine at ${base} is unreachable (${res.status} ${res.statusText}).`);
     }
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      throw new Error('Docker Engine TCP API (localhost:2375) is unreachable.');
+      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      if (isHttps && (base.startsWith('http:') || base.includes('localhost') || base === '/docker-proxy')) {
+        throw new Error(
+          'Browser blocked connection: The live HTTPS site (Vercel) cannot access insecure HTTP localhost (Mixed Content & CORS). To connect your local Docker daemon, run the project locally (npm run dev) or expose Docker Engine with an HTTPS tunnel / remote host.'
+        );
+      }
+      throw new Error(`Docker Engine at ${base} returned non-JSON response.`);
     }
     return await res.json();
   } catch (err: any) {
     if (err?.message?.includes('JSON') || err?.message?.includes('token') || err?.name === 'SyntaxError') {
-      throw new Error('Docker Engine TCP API (localhost:2375) is unreachable.');
+      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      if (isHttps && (base.startsWith('http:') || base.includes('localhost') || base === '/docker-proxy')) {
+        throw new Error(
+          'Browser blocked connection: The live HTTPS site (Vercel) cannot access insecure HTTP localhost (Mixed Content & CORS). To connect your local Docker daemon, run the project locally (npm run dev) or expose Docker Engine with an HTTPS tunnel / remote host.'
+        );
+      }
+      throw new Error(`Docker Engine at ${base} is unreachable.`);
     }
     throw err;
   }
@@ -98,7 +129,7 @@ export async function testDockerConnection(): Promise<DockerSystemInfo> {
 
 export async function fetchDockerContainers(): Promise<DockerContainer[]> {
   try {
-    const res = await fetch(`${DOCKER_BASE}/containers/json?all=true&size=true`);
+    const res = await fetch(`${getDockerBaseUrl()}/containers/json?all=true&size=true`);
     if (!res.ok) return [];
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) return [];
@@ -109,26 +140,26 @@ export async function fetchDockerContainers(): Promise<DockerContainer[]> {
 }
 
 export async function startContainer(id: string): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/containers/${id}/start`, { method: 'POST' });
+  const res = await fetch(`${getDockerBaseUrl()}/containers/${id}/start`, { method: 'POST' });
   if (!res.ok && res.status !== 304) {
     throw new Error(`Failed to start container: ${res.statusText}`);
   }
 }
 
 export async function stopContainer(id: string): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/containers/${id}/stop`, { method: 'POST' });
+  const res = await fetch(`${getDockerBaseUrl()}/containers/${id}/stop`, { method: 'POST' });
   if (!res.ok && res.status !== 304) {
     throw new Error(`Failed to stop container: ${res.statusText}`);
   }
 }
 
 export async function restartContainer(id: string): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/containers/${id}/restart`, { method: 'POST' });
+  const res = await fetch(`${getDockerBaseUrl()}/containers/${id}/restart`, { method: 'POST' });
   if (!res.ok) throw new Error(`Failed to restart container: ${res.statusText}`);
 }
 
 export async function removeContainer(id: string, force = false): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/containers/${id}?force=${force}`, { method: 'DELETE' });
+  const res = await fetch(`${getDockerBaseUrl()}/containers/${id}?force=${force}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`Failed to remove container: ${res.statusText}`);
 }
 
@@ -163,7 +194,7 @@ export async function createContainer(options: CreateContainerOptions): Promise<
     };
   }
 
-  const res = await fetch(`${DOCKER_BASE}/containers/create${query}`, {
+  const res = await fetch(`${getDockerBaseUrl()}/containers/create${query}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -183,7 +214,7 @@ export async function createContainer(options: CreateContainerOptions): Promise<
 
 export async function fetchContainerLogs(id: string, tail = 100): Promise<string> {
   const res = await fetch(
-    `${DOCKER_BASE}/containers/${id}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=true`
+    `${getDockerBaseUrl()}/containers/${id}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=true`
   );
   if (!res.ok) throw new Error(`Failed to fetch logs: ${res.statusText}`);
   // Docker multiplexed stream - extract text frames
@@ -209,7 +240,7 @@ export async function fetchContainerLogs(id: string, tail = 100): Promise<string
 }
 
 export async function fetchContainerStats(id: string): Promise<DockerStats> {
-  const res = await fetch(`${DOCKER_BASE}/containers/${id}/stats?stream=false`);
+  const res = await fetch(`${getDockerBaseUrl()}/containers/${id}/stats?stream=false`);
   if (!res.ok) throw new Error(`Failed to fetch stats: ${res.statusText}`);
   const raw = await res.json();
 
@@ -256,7 +287,7 @@ export async function fetchContainerStats(id: string): Promise<DockerStats> {
 
 export async function fetchDockerImages(): Promise<DockerImage[]> {
   try {
-    const res = await fetch(`${DOCKER_BASE}/images/json?all=false`);
+    const res = await fetch(`${getDockerBaseUrl()}/images/json?all=false`);
     if (!res.ok) return [];
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('application/json')) return [];
@@ -267,7 +298,7 @@ export async function fetchDockerImages(): Promise<DockerImage[]> {
 }
 
 export async function removeImage(id: string, force = false): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/images/${id}?force=${force}`, { method: 'DELETE' });
+  const res = await fetch(`${getDockerBaseUrl()}/images/${id}?force=${force}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`Failed to remove image: ${res.statusText}`);
 }
 
@@ -276,24 +307,24 @@ export async function pullImage(imageName: string): Promise<void> {
     ? imageName.split(':')
     : [imageName, 'latest'];
   const res = await fetch(
-    `${DOCKER_BASE}/images/create?fromImage=${encodeURIComponent(repo)}&tag=${encodeURIComponent(tag)}`,
+    `${getDockerBaseUrl()}/images/create?fromImage=${encodeURIComponent(repo)}&tag=${encodeURIComponent(tag)}`,
     { method: 'POST' }
   );
   if (!res.ok) throw new Error(`Failed to pull image: ${res.statusText}`);
 }
 
 export async function pauseContainer(id: string): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/containers/${id}/pause`, { method: 'POST' });
+  const res = await fetch(`${getDockerBaseUrl()}/containers/${id}/pause`, { method: 'POST' });
   if (!res.ok) throw new Error(`Failed to pause container: ${res.statusText}`);
 }
 
 export async function unpauseContainer(id: string): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/containers/${id}/unpause`, { method: 'POST' });
+  const res = await fetch(`${getDockerBaseUrl()}/containers/${id}/unpause`, { method: 'POST' });
   if (!res.ok) throw new Error(`Failed to unpause container: ${res.statusText}`);
 }
 
 export async function inspectItem(type: 'containers' | 'images' | 'volumes' | 'networks', id: string): Promise<any> {
-  const endpoint = type === 'volumes' ? `${DOCKER_BASE}/volumes/${encodeURIComponent(id)}` : `${DOCKER_BASE}/${type}/${encodeURIComponent(id)}/json`;
+  const endpoint = type === 'volumes' ? `${getDockerBaseUrl()}/volumes/${encodeURIComponent(id)}` : `${getDockerBaseUrl()}/${type}/${encodeURIComponent(id)}/json`;
   const res = await fetch(endpoint);
   if (!res.ok) throw new Error(`Failed to inspect ${type}: ${res.statusText}`);
   return res.json();
@@ -301,7 +332,7 @@ export async function inspectItem(type: 'containers' | 'images' | 'volumes' | 'n
 
 export async function execContainer(id: string, cmd: string[]): Promise<string> {
   // 1. Create Exec instance
-  const createRes = await fetch(`${DOCKER_BASE}/containers/${id}/exec`, {
+  const createRes = await fetch(`${getDockerBaseUrl()}/containers/${id}/exec`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -316,7 +347,7 @@ export async function execContainer(id: string, cmd: string[]): Promise<string> 
   const { Id: execId } = await createRes.json();
 
   // 2. Start Exec instance
-  const startRes = await fetch(`${DOCKER_BASE}/exec/${execId}/start`, {
+  const startRes = await fetch(`${getDockerBaseUrl()}/exec/${execId}/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ Detach: false, Tty: false }),
@@ -348,7 +379,7 @@ export async function execContainer(id: string, cmd: string[]): Promise<string> 
 
 export async function fetchDockerVolumes(): Promise<DockerVolume[]> {
   try {
-    const res = await fetch(`${DOCKER_BASE}/volumes`);
+    const res = await fetch(`${getDockerBaseUrl()}/volumes`);
     if (!res.ok) return [];
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('application/json')) return [];
@@ -360,7 +391,7 @@ export async function fetchDockerVolumes(): Promise<DockerVolume[]> {
 }
 
 export async function createVolume(name: string, driver = 'local'): Promise<DockerVolume> {
-  const res = await fetch(`${DOCKER_BASE}/volumes/create`, {
+  const res = await fetch(`${getDockerBaseUrl()}/volumes/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ Name: name, Driver: driver }),
@@ -370,7 +401,7 @@ export async function createVolume(name: string, driver = 'local'): Promise<Dock
 }
 
 export async function removeVolume(name: string, force = false): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/volumes/${encodeURIComponent(name)}?force=${force}`, {
+  const res = await fetch(`${getDockerBaseUrl()}/volumes/${encodeURIComponent(name)}?force=${force}`, {
     method: 'DELETE',
   });
   if (!res.ok) throw new Error(`Failed to remove volume: ${res.statusText}`);
@@ -380,7 +411,7 @@ export async function removeVolume(name: string, force = false): Promise<void> {
 
 export async function fetchDockerNetworks(): Promise<DockerNetwork[]> {
   try {
-    const res = await fetch(`${DOCKER_BASE}/networks`);
+    const res = await fetch(`${getDockerBaseUrl()}/networks`);
     if (!res.ok) return [];
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('application/json')) return [];
@@ -391,7 +422,7 @@ export async function fetchDockerNetworks(): Promise<DockerNetwork[]> {
 }
 
 export async function createNetwork(name: string, driver = 'bridge'): Promise<{ Id: string }> {
-  const res = await fetch(`${DOCKER_BASE}/networks/create`, {
+  const res = await fetch(`${getDockerBaseUrl()}/networks/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ Name: name, Driver: driver }),
@@ -401,7 +432,7 @@ export async function createNetwork(name: string, driver = 'bridge'): Promise<{ 
 }
 
 export async function removeNetwork(id: string): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/networks/${encodeURIComponent(id)}`, {
+  const res = await fetch(`${getDockerBaseUrl()}/networks/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
   if (!res.ok) throw new Error(`Failed to remove network: ${res.statusText}`);
@@ -409,7 +440,7 @@ export async function removeNetwork(id: string): Promise<void> {
 
 export async function tagImage(id: string, repo: string, tag = 'latest'): Promise<void> {
   const res = await fetch(
-    `${DOCKER_BASE}/images/${encodeURIComponent(id)}/tag?repo=${encodeURIComponent(repo)}&tag=${encodeURIComponent(tag)}`,
+    `${getDockerBaseUrl()}/images/${encodeURIComponent(id)}/tag?repo=${encodeURIComponent(repo)}&tag=${encodeURIComponent(tag)}`,
     { method: 'POST' }
   );
   if (!res.ok) throw new Error(`Failed to tag image: ${res.statusText}`);
@@ -423,10 +454,10 @@ export async function pruneSystem(): Promise<{
   SpaceReclaimed: number;
 }> {
   const [cRes, iRes, nRes, vRes] = await Promise.all([
-    fetch(`${DOCKER_BASE}/containers/prune`, { method: 'POST' }).then((r) => r.json()).catch(() => ({})),
-    fetch(`${DOCKER_BASE}/images/prune`, { method: 'POST' }).then((r) => r.json()).catch(() => ({})),
-    fetch(`${DOCKER_BASE}/networks/prune`, { method: 'POST' }).then((r) => r.json()).catch(() => ({})),
-    fetch(`${DOCKER_BASE}/volumes/prune`, { method: 'POST' }).then((r) => r.json()).catch(() => ({})),
+    fetch(`${getDockerBaseUrl()}/containers/prune`, { method: 'POST' }).then((r) => r.json()).catch(() => ({})),
+    fetch(`${getDockerBaseUrl()}/images/prune`, { method: 'POST' }).then((r) => r.json()).catch(() => ({})),
+    fetch(`${getDockerBaseUrl()}/networks/prune`, { method: 'POST' }).then((r) => r.json()).catch(() => ({})),
+    fetch(`${getDockerBaseUrl()}/volumes/prune`, { method: 'POST' }).then((r) => r.json()).catch(() => ({})),
   ]);
 
   const spaceReclaimed = (cRes.SpaceReclaimed || 0) + (iRes.SpaceReclaimed || 0) + (vRes.SpaceReclaimed || 0);
@@ -459,7 +490,7 @@ export async function pushDockerImage(
     headers['X-Registry-Auth'] = authHeader;
   }
 
-  const res = await fetch(`${DOCKER_BASE}/images/${encodeURIComponent(repo)}/push?tag=${encodeURIComponent(tag)}`, {
+  const res = await fetch(`${getDockerBaseUrl()}/images/${encodeURIComponent(repo)}/push?tag=${encodeURIComponent(tag)}`, {
     method: 'POST',
     headers,
   });
@@ -471,11 +502,11 @@ export async function pushDockerImage(
 }
 
 export function getExportImageTarUrl(imageTag: string): string {
-  return `${DOCKER_BASE}/images/${encodeURIComponent(imageTag)}/get`;
+  return `${getDockerBaseUrl()}/images/${encodeURIComponent(imageTag)}/get`;
 }
 
 export async function importImageTar(file: File): Promise<void> {
-  const res = await fetch(`${DOCKER_BASE}/images/load`, {
+  const res = await fetch(`${getDockerBaseUrl()}/images/load`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-tar' },
     body: file,
@@ -516,7 +547,7 @@ export interface DockerDiskUsage {
 }
 
 export async function fetchDockerDiskUsage(): Promise<DockerDiskUsage> {
-  const res = await fetch(`${DOCKER_BASE}/system/df`);
+  const res = await fetch(`${getDockerBaseUrl()}/system/df`);
   if (!res.ok) throw new Error(`Failed to fetch disk usage: ${res.statusText}`);
   return res.json();
 }
@@ -599,7 +630,7 @@ export async function buildImageFromDockerfile(dockerfileText: string, tag: stri
   // Generate a valid POSIX ustar archive containing the Dockerfile
   const tarBuffer = createTarball([{ name: 'Dockerfile', content: dockerfileText }]);
 
-  const res = await fetch(`${DOCKER_BASE}/build?t=${encodeURIComponent(tag)}`, {
+  const res = await fetch(`${getDockerBaseUrl()}/build?t=${encodeURIComponent(tag)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-tar' },
     body: tarBuffer,
@@ -645,280 +676,4 @@ export function mapDockerState(state: string): 'running' | 'failed' | 'idle' | '
   }
 }
 
-// ─── High-Fidelity Simulation & Mock Datasets ─────────────────────────────────
-
-export const mockDockerSystemInfo: DockerSystemInfo = {
-  Containers: 6,
-  ContainersRunning: 4,
-  ContainersPaused: 1,
-  ContainersStopped: 1,
-  Images: 8,
-  ServerVersion: '25.0.3-ce (Simulated Engine)',
-  OperatingSystem: 'Linux x86_64 (MLOps Pipeline Node)',
-  NCPU: 8,
-  MemTotal: 16 * 1024 * 1024 * 1024,
-  DockerRootDir: '/var/lib/docker',
-  KernelVersion: '5.15.0-91-generic',
-};
-
-export const mockDockerContainers: DockerContainer[] = [
-  {
-    Id: 'c1a7b8e90f23d456789abcdef0123456789abcdef0123456789abcdef0123456',
-    Names: ['/fraud-detection-api'],
-    Image: 'ml-org/fraud-detection-api:v2.4',
-    Status: 'Up (healthy)',
-    State: 'running',
-    Ports: [{ IP: '0.0.0.0', PublicPort: 8000, PrivatePort: 8000, Type: 'tcp' }],
-    Created: Math.floor(Date.now() / 1000) - 3600,
-    SizeRw: 41200000,
-    Mounts: [{ Type: 'bind', Source: '/ml_application', Destination: '/app', Mode: 'rw' }],
-  },
-  {
-    Id: 'c2b8c9d01e34f567890abcdef123456789abcdef123456789abcdef123456789',
-    Names: ['/fullstack-demo-app'],
-    Image: 'devops-org/fullstack-demo-app:v1.0',
-    Status: 'Up (healthy)',
-    State: 'running',
-    Ports: [{ IP: '0.0.0.0', PublicPort: 3000, PrivatePort: 3000, Type: 'tcp' }],
-    Created: Math.floor(Date.now() / 1000) - 2400,
-    SizeRw: 14500000,
-    Mounts: [{ Type: 'bind', Source: '/fullstack_application', Destination: '/app', Mode: 'rw' }],
-  },
-  {
-    Id: 'c3c9d0e12f45a678901bcdef23456789abcdef23456789abcdef23456789abcdef',
-    Names: ['/mldevops-dashboard'],
-    Image: 'mldevops/control-center:latest',
-    Status: 'Up (healthy)',
-    State: 'running',
-    Ports: [{ IP: '0.0.0.0', PublicPort: 5173, PrivatePort: 80, Type: 'tcp' }],
-    Created: Math.floor(Date.now() / 1000) - 7200,
-    SizeRw: 22000000,
-    Mounts: [{ Type: 'bind', Source: '/frontend', Destination: '/usr/share/nginx/html', Mode: 'ro' }],
-  },
-  {
-    Id: 'c4d0e1f23a56b789012cdef3456789abcdef3456789abcdef3456789abcdef34',
-    Names: ['/redis-model-cache'],
-    Image: 'redis:7.0-alpine',
-    Status: 'Up (healthy)',
-    State: 'running',
-    Ports: [{ IP: '0.0.0.0', PublicPort: 6379, PrivatePort: 6379, Type: 'tcp' }],
-    Created: Math.floor(Date.now() / 1000) - 86400,
-    SizeRw: 5120000,
-    Mounts: [{ Type: 'volume', Source: 'redis_cache_persist', Destination: '/data', Mode: 'rw' }],
-  },
-  {
-    Id: 'c5e1f2a34b67c890123def456789abcdef456789abcdef456789abcdef456789',
-    Names: ['/postgres-ml-features'],
-    Image: 'postgres:15-alpine',
-    Status: 'Up (healthy)',
-    State: 'running',
-    Ports: [{ IP: '0.0.0.0', PublicPort: 5432, PrivatePort: 5432, Type: 'tcp' }],
-    Created: Math.floor(Date.now() / 1000) - 86400,
-    SizeRw: 120400000,
-    Mounts: [{ Type: 'volume', Source: 'postgres_feature_store', Destination: '/var/lib/postgresql/data', Mode: 'rw' }],
-  },
-];
-
-export const mockDockerImages: DockerImage[] = [
-  {
-    Id: 'sha256:7a4b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b',
-    RepoTags: ['ml-org/fraud-detection-api:v2.4'],
-    Size: 412000000,
-    Created: Math.floor(Date.now() / 1000) - 86400,
-    Containers: 1,
-    Labels: { maintainer: 'MLOps Pipeline', framework: 'FastAPI / PyTorch' },
-  },
-  {
-    Id: 'sha256:8b5c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c',
-    RepoTags: ['devops-org/fullstack-demo-app:v1.0'],
-    Size: 145000000,
-    Created: Math.floor(Date.now() / 1000) - 86400,
-    Containers: 1,
-    Labels: { maintainer: 'DevOps Platform', runtime: 'Node.js 20' },
-  },
-  {
-    Id: 'sha256:9c6d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d',
-    RepoTags: ['mldevops/control-center:latest'],
-    Size: 89000000,
-    Created: Math.floor(Date.now() / 1000) - 86400,
-    Containers: 1,
-    Labels: { maintainer: 'DevOps Platform', framework: 'React / Vite' },
-  },
-  {
-    Id: 'sha256:ad7e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9da0',
-    RepoTags: ['redis:7.0-alpine'],
-    Size: 33554432,
-    Created: Math.floor(Date.now() / 1000) - 86400 * 7,
-    Containers: 1,
-    Labels: {},
-  },
-  {
-    Id: 'sha256:be8f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9da0b1',
-    RepoTags: ['postgres:15-alpine'],
-    Size: 397410304,
-    Created: Math.floor(Date.now() / 1000) - 86400 * 7,
-    Containers: 1,
-    Labels: {},
-  },
-  {
-    Id: 'sha256:cf9a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9da0b1c2',
-    RepoTags: ['python:3.11-slim'],
-    Size: 134217728,
-    Created: Math.floor(Date.now() / 1000) - 86400 * 14,
-    Containers: 0,
-    Labels: {},
-  },
-  {
-    Id: 'sha256:da0b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9da0b1c2d3',
-    RepoTags: ['node:20-alpine'],
-    Size: 182452224,
-    Created: Math.floor(Date.now() / 1000) - 86400 * 14,
-    Containers: 0,
-    Labels: {},
-  },
-];
-
-export const mockDockerVolumes: DockerVolume[] = [
-  {
-    Name: 'ml_model_weights_data',
-    Driver: 'local',
-    Mountpoint: '/var/lib/docker/volumes/ml_model_weights_data/_data',
-    CreatedAt: new Date(Date.now() - 86400000 * 7).toISOString(),
-    Labels: { project: 'MLOps-Pipeline', tier: 'persistent' },
-  },
-  {
-    Name: 'postgres_feature_store',
-    Driver: 'local',
-    Mountpoint: '/var/lib/docker/volumes/postgres_feature_store/_data',
-    CreatedAt: new Date(Date.now() - 86400000 * 14).toISOString(),
-    Labels: { project: 'MLOps-Pipeline' },
-  },
-  {
-    Name: 'redis_cache_persist',
-    Driver: 'local',
-    Mountpoint: '/var/lib/docker/volumes/redis_cache_persist/_data',
-    CreatedAt: new Date(Date.now() - 86400000 * 21).toISOString(),
-    Labels: {},
-  },
-];
-
-export const mockDockerNetworks: DockerNetwork[] = [
-  {
-    Id: 'net_mlops_bridge_01',
-    Name: 'mlops-bridge',
-    Driver: 'bridge',
-    Scope: 'local',
-    IPAM: { Config: [{ Subnet: '172.28.0.0/16', Gateway: '172.28.0.1' }] },
-    Containers: {
-      c1a7b8e90f23d456789abcdef0123456789abcdef0123456789abcdef0123456: {
-        Name: 'fraud-detection-api',
-        IPv4Address: '172.28.0.2',
-      },
-      c3c9d0e12f45a678901bcdef23456789abcdef23456789abcdef23456789abcdef: {
-        Name: 'redis-model-cache',
-        IPv4Address: '172.28.0.3',
-      },
-    },
-  },
-  {
-    Id: 'net_internal_db_02',
-    Name: 'internal-db-network',
-    Driver: 'bridge',
-    Scope: 'local',
-    IPAM: { Config: [{ Subnet: '172.29.0.0/16', Gateway: '172.29.0.1' }] },
-    Containers: {
-      c4d0e1f23a56b789012cdef3456789abcdef3456789abcdef3456789abcdef34: {
-        Name: 'postgres-ml-features',
-        IPv4Address: '172.29.0.2',
-      },
-    },
-  },
-  {
-    Id: 'net_default_bridge_03',
-    Name: 'bridge',
-    Driver: 'bridge',
-    Scope: 'local',
-    IPAM: { Config: [{ Subnet: '172.17.0.0/16', Gateway: '172.17.0.1' }] },
-    Containers: {},
-  },
-  {
-    Id: 'net_host_04',
-    Name: 'host',
-    Driver: 'host',
-    Scope: 'local',
-    IPAM: { Config: [] },
-    Containers: {},
-  },
-];
-
-export const mockDockerDiskUsage: DockerDiskUsage = {
-  LayersSize: 3200000000,
-  Images: [
-    { Size: 432000000, SharedSize: 120000000 },
-    { Size: 922746880, SharedSize: 200000000 },
-    { Size: 33554432, SharedSize: 0 },
-    { Size: 397410304, SharedSize: 50000000 },
-  ],
-  Containers: [
-    { SizeRw: 41200000, SizeRootFs: 473200000 },
-    { SizeRw: 88000000, SizeRootFs: 1010746880 },
-    { SizeRw: 5120000, SizeRootFs: 38674432 },
-  ],
-  Volumes: [
-    { UsageData: { Size: 1850000000 } },
-    { UsageData: { Size: 740000000 } },
-    { UsageData: { Size: 42000000 } },
-  ],
-};
-
-export function getMockContainerLogs(name: string): string {
-  const ts = () => new Date().toISOString();
-  if (name.includes('fraud-detection')) {
-    return [
-      `${ts()} [INFO] [uvicorn.error] Started server process [1]`,
-      `${ts()} [INFO] [uvicorn.error] Waiting for application startup.`,
-      `${ts()} [INFO] [app.main] Loading PyTorch model weights from /models/fraud_v2.4.pt ...`,
-      `${ts()} [INFO] [app.main] Model loaded successfully: 48.2M parameters on CUDA:0`,
-      `${ts()} [INFO] [uvicorn.error] Application startup complete. Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)`,
-      `${ts()} [INFO] [api.inference] POST /predict - IP: 172.28.0.1 - 200 OK - Latency: 18.4ms - Result: LEGITIMATE (confidence: 0.998)`,
-      `${ts()} [INFO] [api.inference] POST /predict - IP: 172.28.0.1 - 200 OK - Latency: 14.2ms - Result: FRAUD_DETECTED (confidence: 0.942)`,
-      `${ts()} [INFO] [api.inference] POST /predict - IP: 172.28.0.1 - 200 OK - Latency: 16.1ms - Result: LEGITIMATE (confidence: 0.985)`,
-      `${ts()} [INFO] [metrics.exporter] Prometheus telemetry scraped: 3 requests, avg_latency=16.23ms`,
-    ].join('\n');
-  }
-  if (name.includes('redis')) {
-    return [
-      `1:M ${ts()} * Running mode=standalone, port=6379.`,
-      `1:M ${ts()} # Server initialized`,
-      `1:M ${ts()} * Ready to accept connections tcp`,
-      `1:M ${ts()} * DB 0: 1,428 keys (0 volatile) in 2,048 slots HT.`,
-      `1:M ${ts()} * 1 client connected, 0 clients blocked. Memory used: 4.88M`,
-    ].join('\n');
-  }
-  return [
-    `${ts()} [INFO] Initializing container runtime environment...`,
-    `${ts()} [INFO] Configuration loaded from environment variables.`,
-    `${ts()} [INFO] Listening for connections on designated host port...`,
-    `${ts()} [INFO] Service is healthy and processing telemetry requests.`,
-  ].join('\n');
-}
-
-export function getMockContainerStats(id: string): DockerStats {
-  // Generate lively, realistic metrics
-  const seed = id.charCodeAt(0) || 50;
-  const jitter = Math.sin(Date.now() / 2000) * 12;
-  const cpu = Math.max(2.5, Math.min(88, ((seed * 7) % 35) + jitter + 15));
-  const memUsage = 180 * 1024 * 1024 + Math.round(jitter * 8 * 1024 * 1024);
-  const memLimit = 2048 * 1024 * 1024;
-  return {
-    cpu_percent: parseFloat(cpu.toFixed(2)),
-    memory_usage: memUsage,
-    memory_limit: memLimit,
-    memory_percent: parseFloat(((memUsage / memLimit) * 100).toFixed(2)),
-    network_rx: 2450000 + Math.round(Date.now() % 500000),
-    network_tx: 1820000 + Math.round(Date.now() % 350000),
-    block_read: 14200000,
-    block_write: 3840000,
-  };
-}
 

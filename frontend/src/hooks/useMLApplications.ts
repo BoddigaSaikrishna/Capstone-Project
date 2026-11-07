@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { MLApplication, Status } from '@/types';
-import { seedMLApplications } from '@/api/mockData';
 
 interface DBMLApp {
   id: string;
@@ -51,19 +50,20 @@ function toDB(app: Omit<MLApplication, 'id' | 'createdAt'>): Record<string, unkn
 }
 
 export function useMLApplications() {
-  const [apps, setApps] = useState<MLApplication[]>(seedMLApplications);
+  const [apps, setApps] = useState<MLApplication[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchApps = useCallback(async () => {
+    setLoading(true);
     try {
       if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder.supabase.co') {
-        setApps(seedMLApplications);
+        setApps([]);
         return;
       }
 
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Supabase network timeout')), 2500)
+        setTimeout(() => reject(new Error('Supabase network timeout')), 3000)
       );
 
       const fetchPromise = supabase
@@ -73,29 +73,14 @@ export function useMLApplications() {
 
       const { data, error } = (await Promise.race([fetchPromise, timeoutPromise])) as any;
 
-      if (error) {
-        setApps(seedMLApplications);
+      if (error || !data) {
+        setApps([]);
         return;
       }
 
-      if (!data || data.length === 0) {
-        // Seed the database with initial data if empty
-        const inserts = seedMLApplications.map(({ id, createdAt, ...app }) => toDB(app));
-        const { data: seeded, error: seedError } = await supabase
-          .from('ml_applications')
-          .insert(inserts)
-          .select('*');
-
-        if (seedError || !seeded) {
-          setApps(seedMLApplications);
-        } else {
-          setApps(seeded.map(fromDB));
-        }
-      } else {
-        setApps(data.map(fromDB));
-      }
+      setApps(data.map(fromDB));
     } catch {
-      setApps(seedMLApplications);
+      setApps([]);
     } finally {
       setLoading(false);
     }
