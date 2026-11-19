@@ -2323,8 +2323,8 @@ export default function DockerPage() {
       setConnected(false);
       const rawMsg = e?.message || '';
       const cleanError = (rawMsg.includes('JSON') || rawMsg.includes('<!doctype') || rawMsg.includes('token') || rawMsg.includes('SyntaxError'))
-        ? 'Docker TCP endpoint (localhost:2375) is unreachable.'
-        : rawMsg || 'Docker TCP endpoint (localhost:2375) is unreachable.';
+        ? 'Docker daemon is not running on port 2375. Please open Docker Desktop on your PC.'
+        : rawMsg || 'Docker daemon is not running on port 2375. Please open Docker Desktop on your PC.';
       setConnectError(cleanError);
       setIsDemoMode(false);
       setSysInfo(null);
@@ -2600,7 +2600,7 @@ export default function DockerPage() {
             <div>
               <p className="text-xs font-semibold">Docker Daemon Not Connected</p>
               <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-0.5">
-                {connectError ? `${connectError} ` : ''}Ensure Docker Desktop is running locally or configure an endpoint URL.
+                {connectError || 'Docker Desktop is not currently running. Please open Docker Desktop on your PC.'}
               </p>
             </div>
           </div>

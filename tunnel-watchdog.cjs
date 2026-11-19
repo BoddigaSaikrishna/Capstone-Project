@@ -3,6 +3,9 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 
+// Launch Unified Gateway (Jenkins on 8080 + Docker on 2375 + CORS)
+require('./unified-gateway.cjs');
+
 const DOMAIN = 'purplish-exhaust-passable.ngrok-free.dev';
 const POLICY_FILE = path.join(__dirname, 'traffic-policy.yml');
 
@@ -36,13 +39,13 @@ function isTunnelUp() {
 function startNgrok() {
   if (isSpawning) return;
   isSpawning = true;
-  console.log(`[Watchdog ${new Date().toLocaleTimeString()}] ngrok tunnel down. Restarting...`);
+  console.log(`[Watchdog ${new Date().toLocaleTimeString()}] ngrok tunnel down. Restarting gateway tunnel on port 8088...`);
 
   const child = spawn(
     'ngrok',
     [
       'http',
-      '8080',
+      '8088',
       '--url',
       `https://${DOMAIN}`,
       '--traffic-policy-file',

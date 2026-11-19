@@ -74,10 +74,24 @@ export interface DockerStats {
 export function getDockerBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('mldevops_docker_url');
-    if (custom) return custom.replace(/\/$/, '');
+    // If user previously set a temporary trycloudflare URL, clean it up so it defaults to permanent ngrok
+    if (custom && !custom.includes('trycloudflare.com')) {
+      return custom.replace(/\/$/, '');
+    }
+    if (custom && custom.includes('trycloudflare.com')) {
+      localStorage.removeItem('mldevops_docker_url');
+    }
   }
   const envUrl = (import.meta.env.VITE_DOCKER_HOST || '').replace(/\/$/, '');
   if (envUrl) return envUrl;
+
+  // In production / Vercel HTTPS, use the unified ngrok gateway URL with /docker-proxy prefix
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const jenkinsUrl = (import.meta.env.VITE_JENKINS_URL || '').replace(/\/$/, '');
+  if (isHttps && jenkinsUrl && jenkinsUrl.startsWith('https://')) {
+    return `${jenkinsUrl}/docker-proxy`;
+  }
+
   return '/docker-proxy';
 }
 
@@ -91,21 +105,42 @@ export function setDockerBaseUrl(url: string): void {
   }
 }
 
+export function dockerHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    'ngrok-skip-browser-warning': 'true',
+    'Accept': 'application/json',
+    ...extra,
+  };
+}
+
 // ─── Connection Test ──────────────────────────────────────────────────────────
 
 export async function testDockerConnection(): Promise<DockerSystemInfo> {
   const base = getDockerBaseUrl();
   try {
-    const res = await fetch(`${base}/info`);
+    const res = await fetch(`${base}/info`, {
+      headers: {
+        'ngrok-skip-browser-warning': 'true',
+        'Accept': 'application/json',
+      },
+    });
+
     if (!res.ok) {
+      try {
+        const errorData = await res.json();
+        if (errorData?.error) throw new Error(errorData.error);
+      } catch (inner: any) {
+        if (inner?.message && !inner.message.includes('JSON')) throw inner;
+      }
       throw new Error(`Docker Engine at ${base} is unreachable (${res.status} ${res.statusText}).`);
     }
+
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
       if (isHttps && (base.startsWith('http:') || base.includes('localhost') || base === '/docker-proxy')) {
         throw new Error(
-          'Browser blocked connection: The live HTTPS site (Vercel) cannot access insecure HTTP localhost (Mixed Content & CORS). To connect your local Docker daemon, run the project locally (npm run dev) or expose Docker Engine with an HTTPS tunnel / remote host.'
+          'Browser blocked connection: The live HTTPS site (Vercel) cannot access insecure HTTP localhost (Mixed Content & CORS). To connect your local Docker daemon, run the project locally (npm run dev) or open Docker Desktop on your PC.'
         );
       }
       throw new Error(`Docker Engine at ${base} returned non-JSON response.`);
@@ -116,7 +151,7 @@ export async function testDockerConnection(): Promise<DockerSystemInfo> {
       const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
       if (isHttps && (base.startsWith('http:') || base.includes('localhost') || base === '/docker-proxy')) {
         throw new Error(
-          'Browser blocked connection: The live HTTPS site (Vercel) cannot access insecure HTTP localhost (Mixed Content & CORS). To connect your local Docker daemon, run the project locally (npm run dev) or expose Docker Engine with an HTTPS tunnel / remote host.'
+          'Browser blocked connection: The live HTTPS site (Vercel) cannot access insecure HTTP localhost (Mixed Content & CORS). To connect your local Docker daemon, run the project locally (npm run dev) or open Docker Desktop on your PC.'
         );
       }
       throw new Error(`Docker Engine at ${base} is unreachable.`);
@@ -129,7 +164,7 @@ export async function testDockerConnection(): Promise<DockerSystemInfo> {
 
 export async function fetchDockerContainers(): Promise<DockerContainer[]> {
   try {
-    const res = await fetch(`${getDockerBaseUrl()}/containers/json?all=true&size=true`);
+    const res = await fetch(`${getDockerBaseUrl()}/containers/json?all=true&size=true`, { headers: dockerHeaders() });
     if (!res.ok) return [];
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) return [];
@@ -287,7 +322,7 @@ export async function fetchContainerStats(id: string): Promise<DockerStats> {
 
 export async function fetchDockerImages(): Promise<DockerImage[]> {
   try {
-    const res = await fetch(`${getDockerBaseUrl()}/images/json?all=false`);
+    const res = await fetch(`${getDockerBaseUrl()}/images/json?all=false`, { headers: dockerHeaders() });
     if (!res.ok) return [];
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('application/json')) return [];
@@ -379,7 +414,7 @@ export async function execContainer(id: string, cmd: string[]): Promise<string> 
 
 export async function fetchDockerVolumes(): Promise<DockerVolume[]> {
   try {
-    const res = await fetch(`${getDockerBaseUrl()}/volumes`);
+    const res = await fetch(`${getDockerBaseUrl()}/volumes`, { headers: dockerHeaders() });
     if (!res.ok) return [];
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('application/json')) return [];
@@ -411,7 +446,7 @@ export async function removeVolume(name: string, force = false): Promise<void> {
 
 export async function fetchDockerNetworks(): Promise<DockerNetwork[]> {
   try {
-    const res = await fetch(`${getDockerBaseUrl()}/networks`);
+    const res = await fetch(`${getDockerBaseUrl()}/networks`, { headers: dockerHeaders() });
     if (!res.ok) return [];
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('application/json')) return [];
@@ -547,7 +582,7 @@ export interface DockerDiskUsage {
 }
 
 export async function fetchDockerDiskUsage(): Promise<DockerDiskUsage> {
-  const res = await fetch(`${getDockerBaseUrl()}/system/df`);
+  const res = await fetch(`${getDockerBaseUrl()}/system/df`, { headers: dockerHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch disk usage: ${res.statusText}`);
   return res.json();
 }
