@@ -10,10 +10,11 @@ const JENKINS_PORT = 8080;
 const DOCKER_PORT = 2375;
 
 const server = http.createServer((req, res) => {
-  // Global CORS headers
+  // Global CORS headers (set once on response object)
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
   res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Expose-Headers', '*');
   res.setHeader('Access-Control-Max-Age', '86400');
 
   // Fast preflight response
@@ -39,19 +40,20 @@ const server = http.createServer((req, res) => {
   };
 
   const proxyReq = http.request(options, (proxyRes) => {
-    const headers = { ...proxyRes.headers };
-    headers['access-control-allow-origin'] = '*';
-    headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-    headers['access-control-allow-headers'] = '*';
+    // Strip any existing CORS headers from upstream to avoid duplicate headers in browser
+    for (const key of Object.keys(proxyRes.headers)) {
+      if (key.toLowerCase().startsWith('access-control-')) {
+        delete proxyRes.headers[key];
+      }
+    }
 
-    res.writeHead(proxyRes.statusCode, headers);
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
     proxyRes.pipe(res);
   });
 
   proxyReq.on('error', (err) => {
     res.writeHead(503, {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
     });
     if (isDocker) {
       res.end(
