@@ -23,9 +23,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const isDocker = req.url.startsWith('/docker-proxy');
+  const isDocker = req.url.startsWith('/docker-proxy') || req.url.startsWith('/docker') || req.url.startsWith('/do');
   const targetPort = isDocker ? DOCKER_PORT : JENKINS_PORT;
-  const targetPath = isDocker ? req.url.replace(/^\/docker-proxy/, '') || '/' : req.url;
+  const targetPath = isDocker ? (req.url.replace(/^(\/docker-proxy|\/docker|\/do)/, '') || '/') : req.url;
 
   const options = {
     hostname: '127.0.0.1',
@@ -80,3 +80,4 @@ server.listen(GATEWAY_PORT, '127.0.0.1', () => {
 });
 
 module.exports = server;
+
