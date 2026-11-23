@@ -23,6 +23,7 @@ import {
   Monitor,
   Coffee,
   Code2,
+  Square,
 } from 'lucide-react';
 import CodeGenModal from '@/components/ui/CodeGenModal';
 
@@ -256,6 +257,27 @@ export default function PipelinePage() {
     '[READY] Select your app type and repository, then trigger the workflow.',
   ]);
 
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const clearAllTimeouts = () => {
+    timeoutsRef.current.forEach((t) => clearTimeout(t));
+    timeoutsRef.current = [];
+  };
+
+  const addTimeout = (fn: () => void, ms: number) => {
+    const id = setTimeout(fn, ms);
+    timeoutsRef.current.push(id);
+    return id;
+  };
+
+  const handleCancelPipeline = () => {
+    clearAllTimeouts();
+    setAutoRun(false);
+    setSteps((prev) =>
+      prev.map((s) => (s.status === 'running' ? { ...s, status: 'failed', log: 'Pipeline execution cancelled by user.' } : s))
+    );
+    appendLog('[CANCEL] ⏹ Pipeline cancelled by user.');
+  };
+
   // When app type changes, reset pipeline and update repo/commit
   useEffect(() => {
     const p = APP_PROFILES[appType];
@@ -330,10 +352,10 @@ export default function PipelinePage() {
     appendLog(`[GITHUB] Committing: "${commitMsg}" to ${repoName}...`);
     appendLog(`[GITHUB] git add . && git commit -m "${commitMsg}"`);
     appendLog(`[GITHUB] git push origin main → 100% (objects transferred).`);
-    setTimeout(() => {
+    addTimeout(() => {
       setSteps((prev) => prev.map((s) => s.id === 1 ? { ...s, status: 'success', details: { ...s.details, Commit: 'a7f9b2c (Pushed)', Status: 'Synced' } } : s));
       appendLog(`[GITHUB] ✅ Code pushed to ${repoName}. Triggering Jenkins webhook...`);
-      if (autoRun) setTimeout(handleRunJenkins, 1000); else setActiveStep(2);
+      if (autoRun) addTimeout(handleRunJenkins, 1000); else setActiveStep(2);
     }, 1500);
   };
 
@@ -342,11 +364,11 @@ export default function PipelinePage() {
     setActiveStep(2);
     setSteps((prev) => prev.map((s) => (s.id === 2 ? { ...s, status: 'running' } : s)));
     appendLog(`[JENKINS] Pipeline Job #153 started for ${repoName} (${profile.label}).`);
-    profile.jenkinsBuildLogs.forEach((line, i) => setTimeout(() => appendLog(line), i * 300));
-    setTimeout(() => {
+    profile.jenkinsBuildLogs.forEach((line, i) => addTimeout(() => appendLog(line), i * 300));
+    addTimeout(() => {
       setSteps((prev) => prev.map((s) => s.id === 2 ? { ...s, status: 'success', details: { ...s.details, Result: profile.testResult } } : s));
       appendLog(`[JENKINS] ✅ Build #153 PASSED — ${profile.testResult}.`);
-      if (autoRun) setTimeout(handleRunDocker, 1000); else setActiveStep(3);
+      if (autoRun) addTimeout(handleRunDocker, 1000); else setActiveStep(3);
     }, 1800);
   };
 
@@ -355,13 +377,13 @@ export default function PipelinePage() {
     setActiveStep(3);
     setSteps((prev) => prev.map((s) => (s.id === 3 ? { ...s, status: 'running' } : s)));
     appendLog(`[DOCKER] Building: docker build -t ${repoName}:${profile.imageTag} .`);
-    profile.dockerBuildLogs.forEach((line, i) => setTimeout(() => appendLog(line), i * 300));
+    profile.dockerBuildLogs.forEach((line, i) => addTimeout(() => appendLog(line), i * 300));
     appendLog(`[DOCKER] Successfully tagged ${profile.registry}/${repoName}:${profile.imageTag}`);
     appendLog(`[DOCKER] Pushing image (${profile.imageSize}) to registry...`);
-    setTimeout(() => {
+    addTimeout(() => {
       setSteps((prev) => prev.map((s) => s.id === 3 ? { ...s, status: 'success', details: { ...s.details, Status: `Pushed (sha256:8f4b1e...)` } } : s));
       appendLog(`[DOCKER] ✅ ${profile.registry}/${repoName}:${profile.imageTag} pushed to registry.`);
-      if (autoRun) setTimeout(handleRunAWS, 1000); else setActiveStep(4);
+      if (autoRun) addTimeout(handleRunAWS, 1000); else setActiveStep(4);
     }, 1800);
   };
 
@@ -371,8 +393,8 @@ export default function PipelinePage() {
     setSteps((prev) => prev.map((s) => (s.id === 4 ? { ...s, status: 'running' } : s)));
     const targetHost = awsHost.trim() || '54.210.175.126';
     appendLog(`[AWS] Connecting to ${profile.awsService} production fleet (${targetHost})...`);
-    profile.awsDeployLogs.map((l) => l.replace('{repo}', repoName)).forEach((line, i) => setTimeout(() => appendLog(line), i * 400));
-    setTimeout(() => {
+    profile.awsDeployLogs.map((l) => l.replace('{repo}', repoName)).forEach((line, i) => addTimeout(() => appendLog(line), i * 400));
+    addTimeout(() => {
       const endpoint = `http://${targetHost}:${profile.port}${appType === 'ml' ? '/docs' : profile.endpointPath}`;
       setSteps((prev) => prev.map((s) => s.id === 4 ? { ...s, status: 'success', details: { ...s.details, Endpoint: endpoint, Health: '100% Operational' } } : s));
       appendLog(`[AWS] ✅ Deployment complete on ${profile.awsService}!`);
@@ -431,14 +453,23 @@ export default function PipelinePage() {
             <span>Reset Flow</span>
           </button>
 
-          <button
-            onClick={handleAutoRunFullChain}
-            disabled={autoRun || steps.some((s) => s.status === 'running')}
-            className="px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-bold transition-all shadow-lg shadow-primary-500/25 flex items-center gap-2 disabled:opacity-60 cursor-pointer"
-          >
-            <Play className={`w-4 h-4 ${autoRun ? 'animate-spin' : ''}`} />
-            <span>{autoRun ? 'Auto-Executing Tool Chain...' : 'Auto-Run Full 4-Step Chain'}</span>
-          </button>
+          {autoRun || steps.some((s) => s.status === 'running') ? (
+            <button
+              onClick={handleCancelPipeline}
+              className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-all shadow-lg shadow-red-500/25 flex items-center gap-2 cursor-pointer animate-pulse"
+            >
+              <Square className="w-4 h-4 fill-white" />
+              <span>Cancel Pipeline</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleAutoRunFullChain}
+              className="px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-bold transition-all shadow-lg shadow-primary-500/25 flex items-center gap-2 cursor-pointer"
+            >
+              <Play className="w-4 h-4" />
+              <span>Auto-Run Full 4-Step Chain</span>
+            </button>
+          )}
         </div>
       </div>
 

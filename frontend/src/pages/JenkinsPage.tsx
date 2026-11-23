@@ -7,6 +7,7 @@ import {
   fetchJenkinsBuilds,
   fetchJenkinsBuildLog,
   triggerJenkinsBuild,
+  stopJenkinsBuild,
   fetchJenkinsPlugins,
   fetchJenkinsNodes,
   type JenkinsServerInfo,
@@ -41,6 +42,7 @@ import {
   Check,
   ShieldCheck,
   Package,
+  Square,
 } from 'lucide-react';
 import CreateJenkinsItemModal from '@/components/ui/CreateJenkinsItemModal';
 
@@ -92,6 +94,7 @@ export default function JenkinsPage() {
   const [loadingNodes, setLoadingNodes] = useState(false);
   const [loadingLog, setLoadingLog] = useState(false);
   const [triggeringJob, setTriggeringJob] = useState<string | null>(null);
+  const [stoppingBuild, setStoppingBuild] = useState<number | null>(null);
   const [error, setError] = useState('');
 
   const isConfigured = !!(url && username && token);
@@ -237,6 +240,33 @@ export default function JenkinsPage() {
     } catch (err: any) {
       setError(err.message || `Failed to trigger build for "${jobName}".`);
       setTriggeringJob(null);
+    }
+  };
+
+  const handleStopBuild = async (jobName: string, buildNum: number) => {
+    if (!jobName || !buildNum || !isConfigured) return;
+    setStoppingBuild(buildNum);
+    try {
+      await stopJenkinsBuild(url, jobName, buildNum, username, token);
+      setTimeout(async () => {
+        try {
+          const updatedBuilds = await fetchJenkinsBuilds(url, jobName, username, token);
+          setBuilds(updatedBuilds);
+          const updatedJobs = await fetchJenkinsJobs(url, username, token);
+          setPipelines(updatedJobs);
+          if (selectedBuild === buildNum) {
+            const log = await fetchJenkinsBuildLog(url, jobName, buildNum, username, token);
+            setBuildLog(log);
+          }
+        } catch {
+          /* ignore */
+        } finally {
+          setStoppingBuild(null);
+        }
+      }, 1200);
+    } catch (err: any) {
+      setError(err?.message || `Failed to stop build #${buildNum}`);
+      setStoppingBuild(null);
     }
   };
 
@@ -539,18 +569,38 @@ export default function JenkinsPage() {
                           <StatusBadge status={p.status} size="sm" />
                         </td>
                         <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => handleTrigger(p.name)}
-                            disabled={triggeringJob === p.name}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold transition-all disabled:opacity-50 shadow-sm"
-                          >
-                            {triggeringJob === p.name ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Play className="w-3.5 h-3.5 fill-white" />
+                          <div className="flex items-center justify-end gap-2">
+                            {((p.status === 'running' && p.lastBuild > 0) || (selectedJob === p.name && builds.some((b) => b.status === 'running'))) && (
+                              <button
+                                onClick={() => {
+                                  const runningB = builds.find((b) => b.status === 'running');
+                                  handleStopBuild(p.name, runningB?.number || p.lastBuild);
+                                }}
+                                disabled={stoppingBuild !== null}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/30 text-xs font-semibold transition-all shadow-sm cursor-pointer"
+                                title="Abort running build"
+                              >
+                                {stoppingBuild !== null ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Square className="w-3 h-3 fill-current" />
+                                )}
+                                <span>{stoppingBuild !== null ? 'Aborting...' : 'Abort'}</span>
+                              </button>
                             )}
-                            <span>{triggeringJob === p.name ? 'Queuing...' : 'Build Now'}</span>
-                          </button>
+                            <button
+                              onClick={() => handleTrigger(p.name)}
+                              disabled={triggeringJob === p.name}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold transition-all disabled:opacity-50 shadow-sm"
+                            >
+                              {triggeringJob === p.name ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Play className="w-3.5 h-3.5 fill-white" />
+                              )}
+                              <span>{triggeringJob === p.name ? 'Queuing...' : 'Build Now'}</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -606,6 +656,35 @@ export default function JenkinsPage() {
                         <p className="text-[10px] text-gray-400 mt-1">
                           by <span className="font-semibold">{b.triggeredBy}</span>
                         </p>
+                        {b.status === 'running' && (
+                          <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                            <span className="text-[10px] text-orange-400 font-semibold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-ping"></span>
+                              In progress...
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStopBuild(b.pipeline, b.number);
+                              }}
+                              disabled={stoppingBuild === b.number}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all cursor-pointer"
+                            >
+                              {stoppingBuild === b.number ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>Aborting...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Square className="w-2.5 h-2.5 fill-current" />
+                                  <span>Abort #{b.number}</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -618,6 +697,28 @@ export default function JenkinsPage() {
                   title={selectedBuild !== null ? `Build #${selectedBuild} — Console` : 'Console Log'}
                   subtitle="Live console output stream"
                   icon={<Terminal className="w-5 h-5" />}
+                  action={
+                    selectedBuild !== null &&
+                    builds.find((b) => b.number === selectedBuild)?.status === 'running' && (
+                      <button
+                        onClick={() => handleStopBuild(selectedJob, selectedBuild)}
+                        disabled={stoppingBuild === selectedBuild}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-all cursor-pointer"
+                      >
+                        {stoppingBuild === selectedBuild ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Aborting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Square className="w-3 h-3 fill-current" />
+                            <span>Cancel Build #{selectedBuild}</span>
+                          </>
+                        )}
+                      </button>
+                    )
+                  }
                 />
                 <div className="p-4">
                   {loadingLog ? (

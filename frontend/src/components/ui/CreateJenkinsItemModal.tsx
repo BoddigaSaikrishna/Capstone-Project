@@ -50,6 +50,7 @@ export function buildProjectPipelineScript(
         APP_NAME = '${clean}-api'
         IMAGE_TAG = 'latest'
         PORT = '${targetPort}'
+        DOCKER_HOST = 'tcp://127.0.0.1:2375'
     }
 
     stages {

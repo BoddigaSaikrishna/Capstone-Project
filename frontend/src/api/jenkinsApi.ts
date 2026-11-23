@@ -264,6 +264,86 @@ export async function triggerJenkinsBuild(
   return true;
 }
 
+// ─── Stop / Abort a Running Build ───────────────────────────────────────────
+
+export async function stopJenkinsBuild(
+  url: string,
+  jobName: string,
+  buildNumber: number,
+  username: string,
+  token: string
+): Promise<boolean> {
+  const base = resolveBase(url);
+
+  // Try to get CSRF crumb first
+  let crumbHeaders: HeadersInit = {};
+  try {
+    const crumbRes = await fetch(`${base}/crumbIssuer/api/json`, {
+      headers: getAuthHeaders(username, token),
+    });
+    if (crumbRes.ok) {
+      const crumbData = await crumbRes.json();
+      if (crumbData.crumbRequestField && crumbData.crumb) {
+        crumbHeaders = { [crumbData.crumbRequestField]: crumbData.crumb };
+      }
+    }
+  } catch {
+    // CSRF protection optional
+  }
+
+  // Jenkins endpoint to stop/abort a build: POST /job/<jobName>/<number>/stop
+  const response = await fetch(
+    `${base}/job/${encodeURIComponent(jobName)}/${buildNumber}/stop`,
+    {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(username, token),
+        ...crumbHeaders,
+      },
+    }
+  );
+
+  // Jenkins returns 200 or 302 on abort
+  if (!response.ok && response.status !== 302 && response.status !== 200) {
+    // Try /term as secondary fallback
+    try {
+      const termRes = await fetch(
+        `${base}/job/${encodeURIComponent(jobName)}/${buildNumber}/term`,
+        {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(username, token),
+            ...crumbHeaders,
+          },
+        }
+      );
+      if (termRes.ok || termRes.status === 302) return true;
+    } catch {
+      // continue to script console fallback
+    }
+
+    // 3rd tier fallback: Jenkins Script Console
+    try {
+      const scriptBody = `def j = jenkins.model.Jenkins.instance.getItemByFullName('${jobName}'); if (j) { def b = j.getBuildByNumber(${buildNumber}); if (b && b.isBuilding()) { b.doStop(); } }; println('ABORT_OK');`;
+      const scriptRes = await fetch(`${base}/scriptText`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(username, token),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ script: scriptBody }),
+      });
+      if (scriptRes.ok) return true;
+    } catch {
+      // ignore
+    }
+
+    throw new Error(`Failed to stop build #${buildNumber}: ${response.status} ${response.statusText}`);
+  }
+
+  return true;
+}
+
 // ─── Create New Item / Job ───────────────────────────────────────────────────
 
 export interface CreateJenkinsJobParams {
