@@ -257,6 +257,7 @@ export default function PipelinePage() {
     '[READY] Select your app type and repository, then trigger the workflow.',
   ]);
 
+  const autoRunRef = useRef(false);
   const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const clearAllTimeouts = () => {
     timeoutsRef.current.forEach((t) => clearTimeout(t));
@@ -271,6 +272,7 @@ export default function PipelinePage() {
 
   const handleCancelPipeline = () => {
     clearAllTimeouts();
+    autoRunRef.current = false;
     setAutoRun(false);
     setSteps((prev) =>
       prev.map((s) => (s.status === 'running' ? { ...s, status: 'failed', log: 'Pipeline execution cancelled by user.' } : s))
@@ -336,6 +338,8 @@ export default function PipelinePage() {
   };
 
   const handleResetSteps = (repo: string, type: keyof typeof APP_PROFILES) => {
+    clearAllTimeouts();
+    autoRunRef.current = false;
     setAutoRun(false);
     setActiveStep(1);
     setSteps(makeSteps(repo, type));
@@ -355,7 +359,7 @@ export default function PipelinePage() {
     addTimeout(() => {
       setSteps((prev) => prev.map((s) => s.id === 1 ? { ...s, status: 'success', details: { ...s.details, Commit: 'a7f9b2c (Pushed)', Status: 'Synced' } } : s));
       appendLog(`[GITHUB] ✅ Code pushed to ${repoName}. Triggering Jenkins webhook...`);
-      if (autoRun) addTimeout(handleRunJenkins, 1000); else setActiveStep(2);
+      if (autoRunRef.current) addTimeout(handleRunJenkins, 1000); else setActiveStep(2);
     }, 1500);
   };
 
@@ -368,7 +372,7 @@ export default function PipelinePage() {
     addTimeout(() => {
       setSteps((prev) => prev.map((s) => s.id === 2 ? { ...s, status: 'success', details: { ...s.details, Result: profile.testResult } } : s));
       appendLog(`[JENKINS] ✅ Build #153 PASSED — ${profile.testResult}.`);
-      if (autoRun) addTimeout(handleRunDocker, 1000); else setActiveStep(3);
+      if (autoRunRef.current) addTimeout(handleRunDocker, 1000); else setActiveStep(3);
     }, 1800);
   };
 
@@ -383,7 +387,7 @@ export default function PipelinePage() {
     addTimeout(() => {
       setSteps((prev) => prev.map((s) => s.id === 3 ? { ...s, status: 'success', details: { ...s.details, Status: `Pushed (sha256:8f4b1e...)` } } : s));
       appendLog(`[DOCKER] ✅ ${profile.registry}/${repoName}:${profile.imageTag} pushed to registry.`);
-      if (autoRun) addTimeout(handleRunAWS, 1000); else setActiveStep(4);
+      if (autoRunRef.current) addTimeout(handleRunAWS, 1000); else setActiveStep(4);
     }, 1800);
   };
 
@@ -404,12 +408,15 @@ export default function PipelinePage() {
         appendLog(`[AWS] 💡 Local Endpoint: http://localhost:${profile.port}/docs`);
         appendLog(`[AWS] 💡 POST /predict is ready for inference payloads.`);
       }
+      autoRunRef.current = false;
       setAutoRun(false);
     }, 2000);
   };
 
   // Auto-run full pipeline chain
   const handleAutoRunFullChain = () => {
+    clearAllTimeouts();
+    autoRunRef.current = true;
     setAutoRun(true);
     handlePushGitHub();
   };

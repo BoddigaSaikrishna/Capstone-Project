@@ -129,7 +129,7 @@ export async function fetchJenkinsJobs(
 ): Promise<JenkinsPipeline[]> {
   const base = resolveBase(url);
   const response = await fetch(
-    `${base}/api/json?tree=jobs[name,url,color,lastBuild[number,duration,timestamp]]`,
+    `${base}/api/json?tree=jobs[name,url,color,inQueue,lastBuild[number,duration,timestamp,building,result]]`,
     { headers: getAuthHeaders(username, token) }
   );
 
@@ -143,11 +143,12 @@ export async function fetchJenkinsJobs(
     const durationSec = lb?.duration ? Math.round(lb.duration / 1000) : 0;
     const durationStr = durationSec > 0
       ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
-      : 'N/A';
+      : (lb?.building || job.inQueue ? 'In progress...' : 'N/A');
+    const isRunning = Boolean(job.inQueue || lb?.building || (job.color && job.color.endsWith('_anime')));
     return {
       id: `jp_${job.name}`,
       name: job.name,
-      status: mapJenkinsColorToStatus(job.color),
+      status: isRunning ? 'running' : mapJenkinsColorToStatus(job.color),
       lastBuild: lb?.number || 0,
       duration: durationStr,
       triggeredBy: 'Jenkins',
@@ -264,7 +265,7 @@ export async function triggerJenkinsBuild(
   return true;
 }
 
-// ─── Stop / Abort a Running Build ───────────────────────────────────────────
+// ─── Stop / Abort a Running or Queued Build ───────────────────────────────────
 
 export async function stopJenkinsBuild(
   url: string,
@@ -274,12 +275,13 @@ export async function stopJenkinsBuild(
   token: string
 ): Promise<boolean> {
   const base = resolveBase(url);
+  const authHeaders = getAuthHeaders(username, token);
 
   // Try to get CSRF crumb first
   let crumbHeaders: HeadersInit = {};
   try {
     const crumbRes = await fetch(`${base}/crumbIssuer/api/json`, {
-      headers: getAuthHeaders(username, token),
+      headers: authHeaders,
     });
     if (crumbRes.ok) {
       const crumbData = await crumbRes.json();
@@ -288,57 +290,113 @@ export async function stopJenkinsBuild(
       }
     }
   } catch {
-    // CSRF protection optional
+    // CSRF protection optional for API tokens
   }
 
-  // Jenkins endpoint to stop/abort a build: POST /job/<jobName>/<number>/stop
-  const response = await fetch(
-    `${base}/job/${encodeURIComponent(jobName)}/${buildNumber}/stop`,
-    {
+  const postWithAuth = async (endpoint: string) => {
+    try {
+      const res = await fetch(`${base}${endpoint}`, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: {
+          ...authHeaders,
+          ...crumbHeaders,
+        },
+      });
+      return res.ok || res.status === 302 || res.status === 200 || res.type === 'opaqueredirect';
+    } catch {
+      return false;
+    }
+  };
+
+  const encodedJob = encodeURIComponent(jobName);
+  let stopped = false;
+
+  // 1. Try standard Jenkins /stop if we have a build number
+  if (buildNumber > 0) {
+    stopped = await postWithAuth(`/job/${encodedJob}/${buildNumber}/stop`);
+
+    // Give Jenkins a brief moment to process soft stop
+    await new Promise((r) => setTimeout(r, 350));
+
+    // Check if the build actually stopped or is still building (e.g. stuck in executor wait / bat step)
+    let stillBuilding = true;
+    try {
+      const checkRes = await fetch(
+        `${base}/job/${encodedJob}/${buildNumber}/api/json?tree=building,result`,
+        { headers: authHeaders }
+      );
+      if (checkRes.ok) {
+        const info = await checkRes.json();
+        stillBuilding = Boolean(info.building);
+      }
+    } catch {
+      // keep stillBuilding = true so we escalate
+    }
+
+    if (stillBuilding) {
+      await postWithAuth(`/job/${encodedJob}/${buildNumber}/term`);
+      await postWithAuth(`/job/${encodedJob}/${buildNumber}/kill`);
+    }
+  }
+
+  // 2. Also cancel any queued items for this job (handles jobs / node{} tasks stuck waiting for an executor)
+  try {
+    const qRes = await fetch(`${base}/queue/api/json?tree=items[id,task[name,fullDisplayName]]`, {
+      headers: authHeaders,
+    });
+    if (qRes.ok) {
+      const qData = await qRes.json();
+      const matching = (qData.items || []).filter(
+        (item: any) =>
+          item?.task?.name === jobName ||
+          (typeof item?.task?.fullDisplayName === 'string' && item.task.fullDisplayName.includes(jobName))
+      );
+      for (const item of matching) {
+        const qOk = await postWithAuth(`/queue/cancelItem?id=${item.id}`);
+        if (qOk) stopped = true;
+      }
+    }
+  } catch {
+    // ignore queue lookup error
+  }
+
+  // 3. Authoritative Groovy Script Console escalation: force-stops stubborn Pipeline steps & queued PlaceholderTasks
+  try {
+    const safeJob = jobName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const scriptBody = [
+      `def inst = jenkins.model.Jenkins.instance;`,
+      `def q = inst.queue;`,
+      `q.items.findAll { it.task?.name == '${safeJob}' || it.task?.fullDisplayName?.contains('${safeJob}') }.each { q.cancel(it) };`,
+      `def j = inst.getItemByFullName('${safeJob}');`,
+      `if (j) {`,
+      `  if (${buildNumber} > 0) {`,
+      `    def b = j.getBuildByNumber(${buildNumber});`,
+      `    if (b && b.isBuilding()) { b.doStop(); Thread.sleep(250); if (b.isBuilding()) b.doTerm(); Thread.sleep(250); if (b.isBuilding()) b.doKill(); }`,
+      `  }`,
+      `  j.builds.findAll { it.isBuilding() }.each { it.doStop(); Thread.sleep(200); if (it.isBuilding()) it.doTerm(); Thread.sleep(200); if (it.isBuilding()) it.doKill(); }`,
+      `}`,
+      `println('ABORT_OK');`,
+    ].join(' ');
+
+    const scriptRes = await fetch(`${base}/scriptText`, {
       method: 'POST',
       headers: {
-        ...getAuthHeaders(username, token),
+        ...authHeaders,
         ...crumbHeaders,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
+      body: new URLSearchParams({ script: scriptBody }),
+    });
+    if (scriptRes.ok) {
+      stopped = true;
     }
-  );
+  } catch {
+    // ignore script fallback error if standard endpoint already succeeded
+  }
 
-  // Jenkins returns 200 or 302 on abort
-  if (!response.ok && response.status !== 302 && response.status !== 200) {
-    // Try /term as secondary fallback
-    try {
-      const termRes = await fetch(
-        `${base}/job/${encodeURIComponent(jobName)}/${buildNumber}/term`,
-        {
-          method: 'POST',
-          headers: {
-            ...getAuthHeaders(username, token),
-            ...crumbHeaders,
-          },
-        }
-      );
-      if (termRes.ok || termRes.status === 302) return true;
-    } catch {
-      // continue to script console fallback
-    }
-
-    // 3rd tier fallback: Jenkins Script Console
-    try {
-      const scriptBody = `def j = jenkins.model.Jenkins.instance.getItemByFullName('${jobName}'); if (j) { def b = j.getBuildByNumber(${buildNumber}); if (b && b.isBuilding()) { b.doStop(); } }; println('ABORT_OK');`;
-      const scriptRes = await fetch(`${base}/scriptText`, {
-        method: 'POST',
-        headers: {
-          ...getAuthHeaders(username, token),
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ script: scriptBody }),
-      });
-      if (scriptRes.ok) return true;
-    } catch {
-      // ignore
-    }
-
-    throw new Error(`Failed to stop build #${buildNumber}: ${response.status} ${response.statusText}`);
+  if (!stopped) {
+    throw new Error(`Failed to abort "${jobName}"${buildNumber > 0 ? ` build #${buildNumber}` : ''}.`);
   }
 
   return true;

@@ -95,6 +95,7 @@ export default function JenkinsPage() {
   const [loadingLog, setLoadingLog] = useState(false);
   const [triggeringJob, setTriggeringJob] = useState<string | null>(null);
   const [stoppingBuild, setStoppingBuild] = useState<number | null>(null);
+  const [stoppingJob, setStoppingJob] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const isConfigured = !!(url && username && token);
@@ -223,20 +224,51 @@ export default function JenkinsPage() {
     await runConnectionTest(newUrl, newUser, newTok);
   };
 
+  // ── Live auto-polling while any build/job is running, triggering, or stopping ─
+  const hasRunningPipeline = pipelines.some((p) => p.status === 'running');
+  const hasRunningBuild = builds.some((b) => b.status === 'running');
+  useEffect(() => {
+    if (!isConfigured || (!hasRunningPipeline && !hasRunningBuild && !triggeringJob && !stoppingJob)) {
+      return;
+    }
+    const interval = setInterval(async () => {
+      try {
+        const jobs = await fetchJenkinsJobs(url, username, token);
+        setPipelines(jobs);
+        if (selectedJob) {
+          const bList = await fetchJenkinsBuilds(url, selectedJob, username, token);
+          setBuilds(bList);
+          if (selectedBuild !== null) {
+            const log = await fetchJenkinsBuildLog(url, selectedJob, selectedBuild, username, token);
+            setBuildLog(log);
+          }
+        }
+      } catch {
+        /* ignore transient polling error */
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [isConfigured, hasRunningPipeline, hasRunningBuild, triggeringJob, stoppingJob, url, username, token, selectedJob, selectedBuild]);
+
   // ── Trigger Build ─────────────────────────────────────────────────────────────
   const handleTrigger = async (jobName: string) => {
     setTriggeringJob(jobName);
     setError('');
     try {
       await triggerJenkinsBuild(url, jobName, username, token);
+      setSelectedJob(jobName);
       setTimeout(async () => {
         try {
-          const data = await fetchJenkinsBuilds(url, jobName, username, token);
-          setBuilds(data);
-          if (data.length > 0) setSelectedBuild(data[0].number);
+          const [jobsData, buildsData] = await Promise.all([
+            fetchJenkinsJobs(url, username, token),
+            fetchJenkinsBuilds(url, jobName, username, token),
+          ]);
+          setPipelines(jobsData);
+          setBuilds(buildsData);
+          if (buildsData.length > 0) setSelectedBuild(buildsData[0].number);
         } catch { /* Ignore refresh error */ }
         setTriggeringJob(null);
-      }, 2000);
+      }, 1800);
     } catch (err: any) {
       setError(err.message || `Failed to trigger build for "${jobName}".`);
       setTriggeringJob(null);
@@ -244,29 +276,41 @@ export default function JenkinsPage() {
   };
 
   const handleStopBuild = async (jobName: string, buildNum: number) => {
-    if (!jobName || !buildNum || !isConfigured) return;
+    if (!jobName || !isConfigured) return;
+    setStoppingJob(jobName);
     setStoppingBuild(buildNum);
+    setError('');
     try {
       await stopJenkinsBuild(url, jobName, buildNum, username, token);
-      setTimeout(async () => {
+      const refresh = async () => {
         try {
-          const updatedBuilds = await fetchJenkinsBuilds(url, jobName, username, token);
-          setBuilds(updatedBuilds);
-          const updatedJobs = await fetchJenkinsJobs(url, username, token);
+          const [updatedJobs, updatedBuilds] = await Promise.all([
+            fetchJenkinsJobs(url, username, token),
+            fetchJenkinsBuilds(url, jobName, username, token),
+          ]);
           setPipelines(updatedJobs);
-          if (selectedBuild === buildNum) {
-            const log = await fetchJenkinsBuildLog(url, jobName, buildNum, username, token);
-            setBuildLog(log);
+          if (selectedJob === jobName) {
+            setBuilds(updatedBuilds);
+            const logTarget = selectedBuild ?? (buildNum > 0 ? buildNum : updatedBuilds[0]?.number ?? null);
+            if (logTarget !== null) {
+              const log = await fetchJenkinsBuildLog(url, jobName, logTarget, username, token);
+              setBuildLog(log);
+            }
           }
         } catch {
           /* ignore */
-        } finally {
-          setStoppingBuild(null);
         }
-      }, 1200);
+      };
+      await refresh();
+      setTimeout(async () => {
+        await refresh();
+        setStoppingBuild(null);
+        setStoppingJob(null);
+      }, 1000);
     } catch (err: any) {
-      setError(err?.message || `Failed to stop build #${buildNum}`);
+      setError(err?.message || `Failed to stop build${buildNum > 0 ? ` #${buildNum}` : ''}`);
       setStoppingBuild(null);
+      setStoppingJob(null);
     }
   };
 
@@ -570,22 +614,22 @@ export default function JenkinsPage() {
                         </td>
                         <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-2">
-                            {((p.status === 'running' && p.lastBuild > 0) || (selectedJob === p.name && builds.some((b) => b.status === 'running'))) && (
+                            {(p.status === 'running' || (selectedJob === p.name && builds.some((b) => b.status === 'running'))) && (
                               <button
                                 onClick={() => {
-                                  const runningB = builds.find((b) => b.status === 'running');
-                                  handleStopBuild(p.name, runningB?.number || p.lastBuild);
+                                  const runningB = selectedJob === p.name ? builds.find((b) => b.status === 'running') : undefined;
+                                  handleStopBuild(p.name, runningB?.number ?? (p.lastBuild || 0));
                                 }}
-                                disabled={stoppingBuild !== null}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/30 text-xs font-semibold transition-all shadow-sm cursor-pointer"
-                                title="Abort running build"
+                                disabled={stoppingJob === p.name}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/30 text-xs font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-60"
+                                title="Abort running or queued build"
                               >
-                                {stoppingBuild !== null ? (
+                                {stoppingJob === p.name ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                 ) : (
                                   <Square className="w-3 h-3 fill-current" />
                                 )}
-                                <span>{stoppingBuild !== null ? 'Aborting...' : 'Abort'}</span>
+                                <span>{stoppingJob === p.name ? 'Aborting...' : 'Abort'}</span>
                               </button>
                             )}
                             <button
@@ -632,10 +676,18 @@ export default function JenkinsPage() {
                 ) : (
                   <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
                     {builds.map((b) => (
-                      <button
+                      <div
                         key={b.id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setSelectedBuild(b.number)}
-                        className={`w-full text-left p-3 rounded-xl border transition-all ${
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedBuild(b.number);
+                          }
+                        }}
+                        className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer ${
                           selectedBuild === b.number
                             ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-700 shadow-sm'
                             : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900/60'
@@ -668,10 +720,10 @@ export default function JenkinsPage() {
                                 e.stopPropagation();
                                 handleStopBuild(b.pipeline, b.number);
                               }}
-                              disabled={stoppingBuild === b.number}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all cursor-pointer"
+                              disabled={stoppingBuild === b.number || stoppingJob === b.pipeline}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all cursor-pointer disabled:opacity-60"
                             >
-                              {stoppingBuild === b.number ? (
+                              {stoppingBuild === b.number || stoppingJob === b.pipeline ? (
                                 <>
                                   <Loader2 className="w-3 h-3 animate-spin" />
                                   <span>Aborting...</span>
@@ -685,7 +737,7 @@ export default function JenkinsPage() {
                             </button>
                           </div>
                         )}
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -702,10 +754,10 @@ export default function JenkinsPage() {
                     builds.find((b) => b.number === selectedBuild)?.status === 'running' && (
                       <button
                         onClick={() => handleStopBuild(selectedJob, selectedBuild)}
-                        disabled={stoppingBuild === selectedBuild}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-all cursor-pointer"
+                        disabled={stoppingBuild === selectedBuild || stoppingJob === selectedJob}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-all cursor-pointer disabled:opacity-60"
                       >
-                        {stoppingBuild === selectedBuild ? (
+                        {stoppingBuild === selectedBuild || stoppingJob === selectedJob ? (
                           <>
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             <span>Aborting...</span>
