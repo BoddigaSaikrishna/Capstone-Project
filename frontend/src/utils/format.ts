@@ -16,3 +16,20 @@ export function formatTime(iso: string): string {
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+/** Copies text to the system clipboard with a textarea fallback for restricted contexts. */
+export async function copyToClipboard(text: string): Promise<void> {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
+}

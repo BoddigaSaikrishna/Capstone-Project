@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Card, { CardHeader } from '@/components/ui/Card';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { copyToClipboard } from '@/utils/format';
 import {
   Github,
   Server,
@@ -24,6 +25,8 @@ import {
   Coffee,
   Code2,
   Square,
+  Copy,
+  Check,
 } from 'lucide-react';
 import CodeGenModal from '@/components/ui/CodeGenModal';
 
@@ -252,6 +255,7 @@ export default function PipelinePage() {
   const [autoRun, setAutoRun] = useState(false);
   const [awsHost, setAwsHost] = useState('54.210.175.126');
   const [showCodeGenModal, setShowCodeGenModal] = useState(false);
+  const [copiedLogs, setCopiedLogs] = useState(false);
   const [logs, setLogs] = useState<string[]>([
     '[INIT] DevOps Automation Pipeline Studio initialized.',
     '[READY] Select your app type and repository, then trigger the workflow.',
@@ -335,6 +339,14 @@ export default function PipelinePage() {
 
   const appendLog = (line: string) => {
     setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${line}`]);
+  };
+
+  const handleCopyLogs = async () => {
+    const text = logs.join('\n');
+    if (!text) return;
+    await copyToClipboard(text);
+    setCopiedLogs(true);
+    setTimeout(() => setCopiedLogs(false), 2000);
   };
 
   const handleResetSteps = (repo: string, type: keyof typeof APP_PROFILES) => {
@@ -859,10 +871,34 @@ export default function PipelinePage() {
                 <Terminal className="w-4 h-4 text-primary-400" />
                 <span className="text-xs font-mono font-bold text-gray-200">Live Pipeline Execution Console</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-error-500" />
-                <span className="w-2.5 h-2.5 rounded-full bg-warning-500" />
-                <span className="w-2.5 h-2.5 rounded-full bg-success-500" />
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleCopyLogs}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md border text-[11px] font-semibold transition-all cursor-pointer ${
+                    copiedLogs
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700'
+                  }`}
+                  title="Copy console output to clipboard"
+                >
+                  {copiedLogs ? (
+                    <>
+                      <Check className="w-3 h-3" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-error-500" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-warning-500" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-success-500" />
+                </div>
               </div>
             </div>
 

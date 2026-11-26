@@ -15,7 +15,7 @@ import {
   type JenkinsNode,
 } from '@/api/jenkinsApi';
 import type { JenkinsPipeline, JenkinsBuild } from '@/types';
-import { formatRelative } from '@/utils/format';
+import { formatRelative, copyToClipboard } from '@/utils/format';
 import {
   Server,
   Play,
@@ -40,6 +40,7 @@ import {
   Wrench,
   Layers,
   Check,
+  Copy,
   ShieldCheck,
   Package,
   Square,
@@ -96,6 +97,7 @@ export default function JenkinsPage() {
   const [triggeringJob, setTriggeringJob] = useState<string | null>(null);
   const [stoppingBuild, setStoppingBuild] = useState<number | null>(null);
   const [stoppingJob, setStoppingJob] = useState<string | null>(null);
+  const [copiedLog, setCopiedLog] = useState(false);
   const [error, setError] = useState('');
 
   const isConfigured = !!(url && username && token);
@@ -322,6 +324,13 @@ export default function JenkinsPage() {
     } catch {
       /* Ignore */
     }
+  };
+
+  const handleCopyLog = async () => {
+    if (!buildLog) return;
+    await copyToClipboard(buildLog);
+    setCopiedLog(true);
+    setTimeout(() => setCopiedLog(false), 2000);
   };
 
   const logLines = buildLog.split('\n');
@@ -750,26 +759,52 @@ export default function JenkinsPage() {
                   subtitle="Live console output stream"
                   icon={<Terminal className="w-5 h-5" />}
                   action={
-                    selectedBuild !== null &&
-                    builds.find((b) => b.number === selectedBuild)?.status === 'running' && (
-                      <button
-                        onClick={() => handleStopBuild(selectedJob, selectedBuild)}
-                        disabled={stoppingBuild === selectedBuild || stoppingJob === selectedJob}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-all cursor-pointer disabled:opacity-60"
-                      >
-                        {stoppingBuild === selectedBuild || stoppingJob === selectedJob ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Aborting...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Square className="w-3 h-3 fill-current" />
-                            <span>Cancel Build #{selectedBuild}</span>
-                          </>
+                    <div className="flex items-center gap-2">
+                      {selectedBuild !== null && !loadingLog && buildLog && (
+                        <button
+                          type="button"
+                          onClick={handleCopyLog}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                            copiedLog
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700'
+                          }`}
+                          title="Copy full console log to clipboard"
+                        >
+                          {copiedLog ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {selectedBuild !== null &&
+                        builds.find((b) => b.number === selectedBuild)?.status === 'running' && (
+                          <button
+                            onClick={() => handleStopBuild(selectedJob, selectedBuild)}
+                            disabled={stoppingBuild === selectedBuild || stoppingJob === selectedJob}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-all cursor-pointer disabled:opacity-60"
+                          >
+                            {stoppingBuild === selectedBuild || stoppingJob === selectedJob ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Aborting...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Square className="w-3 h-3 fill-current" />
+                                <span>Cancel Build #{selectedBuild}</span>
+                              </>
+                            )}
+                          </button>
                         )}
-                      </button>
-                    )
+                    </div>
                   }
                 />
                 <div className="p-4">
