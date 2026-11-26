@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { createJenkinsJob } from '@/api/jenkinsApi';
+import { fetchUserRepos, type RealGitHubRepo } from '@/api/githubApi';
 import {
   Server,
   X,
@@ -12,8 +13,9 @@ import {
   Box,
   Code2,
   Sparkles,
-  RefreshCw,
   Layers,
+  GitBranch,
+  Github,
 } from 'lucide-react';
 
 interface CreateJenkinsItemModalProps {
@@ -28,7 +30,9 @@ interface CreateJenkinsItemModalProps {
 export function buildProjectPipelineScript(
   projectName: string,
   targetPort: number = 8001,
-  ownerName?: string
+  ownerName?: string,
+  customRepoUrl?: string,
+  branchName: string = 'main'
 ): string {
   const clean = (projectName || 'ml-project')
     .trim()
@@ -41,7 +45,8 @@ export function buildProjectPipelineScript(
     : 'BoddigaSaikrishna';
   const owner = (ownerName || defaultOwner).trim() || 'BoddigaSaikrishna';
   const repoName = (projectName || 'ML-Model-Test-Project').trim();
-  const repoUrl = `https://github.com/${owner}/${repoName}.git`;
+  const repoUrl = (customRepoUrl || `https://github.com/${owner}/${repoName}.git`).trim();
+  const branch = (branchName || 'main').trim() || 'main';
 
   return `pipeline {
     agent any
@@ -57,7 +62,7 @@ export function buildProjectPipelineScript(
         stage('1. GitHub Source Checkout') {
             steps {
                 echo '[TOOL 1: GITHUB] Pulling ${repoName} from GitHub...'
-                git branch: 'main', url: '${repoUrl}'
+                git branch: '${branch}', url: '${repoUrl}'
             }
         }
         stage('2. Automated Quality & Unit Tests') {
@@ -94,10 +99,18 @@ export default function CreateJenkinsItemModal({
   onClose,
   onSuccess,
 }: CreateJenkinsItemModalProps) {
+  const currentOwner = typeof window !== 'undefined'
+    ? (localStorage.getItem('mldevops_github_username') || 'BoddigaSaikrishna')
+    : 'BoddigaSaikrishna';
+
   const [jobName, setJobName] = useState('');
   const [description, setDescription] = useState('');
   const [jobType, setJobType] = useState<'pipeline' | 'freestyle'>('pipeline');
   const [targetPort, setTargetPort] = useState<number>(8001);
+  const [repoUrl, setRepoUrl] = useState<string>(`https://github.com/${currentOwner}/ML-Model-Test-Project.git`);
+  const [branch, setBranch] = useState<string>('main');
+  const [repoUrlEdited, setRepoUrlEdited] = useState(false);
+  const [githubRepos, setGithubRepos] = useState<RealGitHubRepo[]>([]);
   const [pipelineScript, setPipelineScript] = useState<string>(() =>
     buildProjectPipelineScript('ML-Model-Test-Project', 8001)
   );
@@ -106,23 +119,56 @@ export default function CreateJenkinsItemModal({
   const [error, setError] = useState('');
   const [isGenerated, setIsGenerated] = useState(false);
 
-  // Auto-generate script on mount or when jobName / port changes (if user hasn't heavily modified it)
-  const handleAutoGenerate = (customName?: string, customPort?: number) => {
+  // Load user's GitHub repositories when modal opens for quick-pick and fuzzy matching
+  useEffect(() => {
+    if (!isOpen) return;
+    const ghUser = localStorage.getItem('mldevops_github_username') || 'BoddigaSaikrishna';
+    const ghToken = localStorage.getItem('mldevops_github_token') || undefined;
+    fetchUserRepos(ghUser, ghToken)
+      .then((repos) => setGithubRepos(repos || []))
+      .catch(() => setGithubRepos([]));
+  }, [isOpen]);
+
+  // Auto-generate script on mount or when jobName / port / repoUrl / branch changes
+  const handleAutoGenerate = (
+    customName?: string,
+    customPort?: number,
+    customRepo?: string,
+    customBranch?: string
+  ) => {
     const nameToUse = (customName !== undefined ? customName : jobName) || 'ML-Model-Test-Project';
     const portToUse = customPort !== undefined ? customPort : targetPort;
-    const generated = buildProjectPipelineScript(nameToUse, portToUse);
+    const repoToUse = customRepo !== undefined ? customRepo : repoUrl;
+    const branchToUse = customBranch !== undefined ? customBranch : branch;
+    const generated = buildProjectPipelineScript(nameToUse, portToUse, currentOwner, repoToUse, branchToUse);
     setPipelineScript(generated);
     setIsGenerated(true);
     setTimeout(() => setIsGenerated(false), 2000);
   };
 
-  // When jobName changes, auto-sync script if it matches default pattern
+  // When jobName changes, auto-match a real GitHub repo if available, else derive from jobName
   const handleJobNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setJobName(val);
-    if (val.trim()) {
-      handleAutoGenerate(val, targetPort);
+    const trimmed = val.trim();
+    if (!trimmed) return;
+
+    let nextRepo = repoUrl;
+    let nextBranch = branch;
+    if (!repoUrlEdited) {
+      const lower = trimmed.toLowerCase();
+      const exact = githubRepos.find((r) => r.name.toLowerCase() === lower);
+      const fuzzy = exact || githubRepos.find((r) => r.name.toLowerCase().includes(lower));
+      if (fuzzy) {
+        nextRepo = `${fuzzy.html_url}.git`;
+        nextBranch = fuzzy.default_branch || 'main';
+      } else {
+        nextRepo = `https://github.com/${currentOwner}/${trimmed}.git`;
+      }
+      setRepoUrl(nextRepo);
+      setBranch(nextBranch);
     }
+    handleAutoGenerate(val, targetPort, nextRepo, nextBranch);
   };
 
   if (!isOpen) return null;
@@ -135,7 +181,11 @@ export default function CreateJenkinsItemModal({
     setDescription('');
     setJobType('pipeline');
     setTargetPort(8001);
-    setPipelineScript(buildProjectPipelineScript('ML-Model-Test-Project', 8001));
+    const defRepo = `https://github.com/${currentOwner}/ML-Model-Test-Project.git`;
+    setRepoUrl(defRepo);
+    setBranch('main');
+    setRepoUrlEdited(false);
+    setPipelineScript(buildProjectPipelineScript('ML-Model-Test-Project', 8001, currentOwner, defRepo, 'main'));
     setError('');
     setCreatedName(null);
     onClose();
@@ -169,10 +219,6 @@ export default function CreateJenkinsItemModal({
       setLoading(false);
     }
   };
-
-  const currentOwner = typeof window !== 'undefined'
-    ? (localStorage.getItem('mldevops_github_username') || 'BoddigaSaikrishna')
-    : 'BoddigaSaikrishna';
 
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -271,28 +317,90 @@ export default function CreateJenkinsItemModal({
 
               {/* Port & GitHub Target Helper */}
               {jobType === 'pipeline' && (
-                <div className="p-3 rounded-xl bg-gray-950 border border-gray-800 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Layers className="w-4 h-4 text-orange-400 shrink-0" />
-                    <span>Target Port:</span>
-                    <select
-                      value={targetPort}
-                      onChange={(e) => {
-                        const p = Number(e.target.value);
-                        setTargetPort(p);
-                        handleAutoGenerate(jobName, p);
-                      }}
-                      className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-orange-300 font-mono focus:outline-none focus:border-orange-500"
-                    >
-                      <option value={8001}>8001 (Recommended for 2nd App)</option>
-                      <option value={8002}>8002 (3rd App)</option>
-                      <option value={8080}>8080</option>
-                      <option value={5000}>5000</option>
-                    </select>
+                <div className="p-3.5 rounded-xl bg-gray-950 border border-gray-800 space-y-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Layers className="w-4 h-4 text-orange-400 shrink-0" />
+                      <span>Target Port:</span>
+                      <select
+                        value={targetPort}
+                        onChange={(e) => {
+                          const p = Number(e.target.value);
+                          setTargetPort(p);
+                          handleAutoGenerate(jobName, p, repoUrl, branch);
+                        }}
+                        className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-orange-300 font-mono focus:outline-none focus:border-orange-500"
+                      >
+                        <option value={8001}>8001 (Recommended for 2nd App)</option>
+                        <option value={8002}>8002 (3rd App)</option>
+                        <option value={8080}>8080</option>
+                        <option value={5000}>5000</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-gray-400">
+                      <GitBranch className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                      <span>Branch:</span>
+                      <input
+                        type="text"
+                        value={branch}
+                        onChange={(e) => {
+                          const b = e.target.value;
+                          setBranch(b);
+                          handleAutoGenerate(jobName, targetPort, repoUrl, b);
+                        }}
+                        className="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 font-mono focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
                   </div>
-                  <span className="text-[11px] text-gray-500 font-mono">
-                    @{currentOwner}/{jobName || 'ML-Model-Test-Project'}
-                  </span>
+
+                  {/* Quick-pick from connected GitHub repos */}
+                  {githubRepos.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Github className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <select
+                        value={githubRepos.find((r) => `${r.html_url}.git` === repoUrl)?.full_name || ''}
+                        onChange={(e) => {
+                          const selected = githubRepos.find((r) => r.full_name === e.target.value);
+                          if (selected) {
+                            const nextRepo = `${selected.html_url}.git`;
+                            const nextBranch = selected.default_branch || 'main';
+                            setRepoUrl(nextRepo);
+                            setBranch(nextBranch);
+                            setRepoUrlEdited(true);
+                            handleAutoGenerate(jobName || selected.name, targetPort, nextRepo, nextBranch);
+                          }
+                        }}
+                        className="w-full bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-orange-500"
+                      >
+                        <option value="">Quick-select a GitHub repository...</option>
+                        {githubRepos.map((r) => (
+                          <option key={r.id} value={r.full_name}>
+                            {r.full_name} {r.private ? '(Private)' : '(Public)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Editable GitHub Clone URL */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-400 mb-1">
+                      GitHub Repository Clone URL
+                    </label>
+                    <input
+                      type="text"
+                      value={repoUrl}
+                      onChange={(e) => {
+                        const nextRepo = e.target.value;
+                        setRepoUrl(nextRepo);
+                        setRepoUrlEdited(true);
+                        handleAutoGenerate(jobName, targetPort, nextRepo, branch);
+                      }}
+                      placeholder={`https://github.com/${currentOwner}/your-repo.git`}
+                      className="w-full bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
                 </div>
               )}
 

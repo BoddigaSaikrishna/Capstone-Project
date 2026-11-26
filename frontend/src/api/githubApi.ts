@@ -121,8 +121,8 @@ async function handleApiError(response: Response, context: string): Promise<neve
 export async function fetchUserRepos(username: string, token?: string): Promise<RealGitHubRepo[]> {
   const headers = getHeaders(token);
   const endpoint = token && token.trim()
-    ? `${GITHUB_API_BASE}/user/repos?sort=updated&per_page=15`
-    : `${GITHUB_API_BASE}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=15`;
+    ? `${GITHUB_API_BASE}/user/repos?sort=updated&per_page=100`
+    : `${GITHUB_API_BASE}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=100`;
 
   const response = await fetch(endpoint, { headers });
   if (!response.ok) {
