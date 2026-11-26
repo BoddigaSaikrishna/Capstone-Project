@@ -374,10 +374,10 @@ export async function stopJenkinsBuild(
       `    def b = j.getBuildByNumber(${buildNumber});`,
       `    if (b && b.isBuilding()) { b.doStop(); Thread.sleep(250); if (b.isBuilding()) b.doTerm(); Thread.sleep(250); if (b.isBuilding()) b.doKill(); }`,
       `  }`,
-      `  j.builds.findAll { it.isBuilding() }.each { it.doStop(); Thread.sleep(200); if (it.isBuilding()) it.doTerm(); Thread.sleep(200); if (it.isBuilding()) it.doKill(); }`,
+      `  j.getBuilds().findAll { it.isBuilding() }.each { it.doStop(); Thread.sleep(200); if (it.isBuilding()) it.doTerm(); Thread.sleep(200); if (it.isBuilding()) it.doKill(); }`,
       `}`,
       `println('ABORT_OK');`,
-    ].join(' ');
+    ].join('\n');
 
     const scriptRes = await fetch(`${base}/scriptText`, {
       method: 'POST',
